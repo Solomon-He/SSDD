@@ -1,0 +1,95 @@
+{
+  "status": "passed",
+  "generated_at": "2026-11-03T14:10:52.945001+00:00",
+  "onnxruntime": "1.31.1",
+  "numpy": "2.2.6",
+  "opencv": "4.12.0",
+  "scope": "Java/Python ONNX numerical alignment and original Python postprocess; not PyTorch checkpoint or accuracy validation",
+  "source_files": [
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\src\\model.py",
+      "sha256": "1acabb8f446280448543c914cdf13f579d189048fae9b4389a5049aceba29307"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\src\\dataset.py",
+      "sha256": "d3a5ba5f2026fa3f489e4a6ad6070f118154bd9221ad83dbd065a09dc6c9f9a7"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\src\\postprocess.py",
+      "sha256": "2cd3753c218824c4f0f8e6bf2ebfcb6f3442984ea66606200058cdf4be6e6c1a"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\src\\tta.py",
+      "sha256": "0df4fc289ec5b77e3e447df9b3c4caee372528897b4407856a8827faeb8c23b7"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\src\\augmentation.py",
+      "sha256": "bf4079eab8bea7aaded124fb1d534aaa3eb221286beba76e5f37c34d5b19d21b"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\configs\\Unet_densenet201.yaml",
+      "sha256": "5a6c8944c64d89c46d7022cd7a87d918a87f40dedd1875f19755d7c2fbf6617e"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\configs\\Unet++_resnet34.yaml",
+      "sha256": "11e8333f6faa826a525949b3a0d7fb8a4f2dff2e14b7bece3600c70c96ccd5b6"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\docs\\deploy_v2_node_onnxruntime.md",
+      "sha256": "70abd2ce667f95f75112d498a98df4965df4cde30d11874f1c373c8ccc1a933d"
+    },
+    {
+      "path": "D:\\DeepLearning\\severstal-steel-defect-detection\\steel-defect-v2.ipynb",
+      "sha256": "b25feb9318cbd771126ca914bf82345d9b58f17855d6ba244be7be9e445f3dcd"
+    }
+  ],
+  "models": [
+    {
+      "file": "Unet_densenet201_v2_cleaned.onnx",
+      "image": "0025bde0c.jpg",
+      "max_abs_logit_error": 0.0,
+      "rtol": 0.0001,
+      "atol": 0.0001,
+      "logits_allclose": true,
+      "source_postprocess_differing_pixels": 0,
+      "class_pixels": [
+        0,
+        0,
+        26605,
+        18920
+      ],
+      "imageio_opencv_max_pixel_difference": 0.0,
+      "imageio_opencv_differing_values": 0,
+      "mask_sha256": [
+        "d58201a30b35a60612306667b083ca4dfaf9efa107386fff36188e42c34c3c19",
+        "d58201a30b35a60612306667b083ca4dfaf9efa107386fff36188e42c34c3c19",
+        "e70828f0dd13141688cebd1dfae969c8d55d1e2ee76f0abc47e35e526c3ba5f7",
+        "216df291d3ef5f25992724653cedf7106fe20bb5a973e9087ee2376be1bbd63d"
+      ]
+    },
+    {
+      "file": "UnetPlusPlus_resnet34_v2_cleaned.onnx",
+      "image": "0025bde0c.jpg",
+      "max_abs_logit_error": 0.0,
+      "rtol": 0.0001,
+      "atol": 0.0001,
+      "logits_allclose": true,
+      "source_postprocess_differing_pixels": 0,
+      "class_pixels": [
+        0,
+        0,
+        31519,
+        15569
+      ],
+      "imageio_opencv_max_pixel_difference": 0.0,
+      "imageio_opencv_differing_values": 0,
+      "mask_sha256": [
+        "d58201a30b35a60612306667b083ca4dfaf9efa107386fff36188e42c34c3c19",
+        "d58201a30b35a60612306667b083ca4dfaf9efa107386fff36188e42c34c3c19",
+        "720e60da547181053c72facb85703bb5d0c898bf1e643b9dc511f7b7c8cad4c0",
+        "4aef14365e3f88820f3361c5221c76a384960f4b4817c5c2c665157519ad77a1"
+      ]
+    }
+  ],
+  "synthetic_threshold_and_overlap_fixture": "passed"
+}

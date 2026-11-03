@@ -1,0 +1,16 @@
+spring:
+  config:
+    import: optional:file:./application-local.yml
+
+ssdd:
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html

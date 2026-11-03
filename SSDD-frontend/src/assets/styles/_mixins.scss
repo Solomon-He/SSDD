@@ -1,0 +1,56 @@
+// ============================================================
+// GitHub 风格 box-shadow 边框系统 —— SsBase 共享 mixin
+// ============================================================
+// 所有 SsBase 表单控件（SsInput / SsSelect / SsDatePicker）
+// 使用 box-shadow 代替 border 以避免布局空间占用，
+// 同时提供 hover / focus 交互反馈。
+//
+// 用法：
+//   @use '@/assets/styles/mixins' as *;
+//   .wrapper { @include ss-field; }
+//   .wrapper.is-focus { @include ss-field-focus; }
+// ============================================================
+
+/// 默认 + hover 状态
+@mixin ss-field {
+  border-radius: var(--border-radius);
+  box-shadow:
+    0 1px 2px rgba(27, 31, 36, 0.05),
+    0 0 0 1px var(--border-color) inset;
+  transition: all 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+
+  &:hover {
+    box-shadow:
+      0 1px 2px rgba(27, 31, 36, 0.05),
+      0 0 0 1px var(--text-secondary) inset;
+  }
+}
+
+/// 聚焦状态（含 inset 描边 + 外发光环）
+@mixin ss-field-focus {
+  box-shadow:
+    0 0 0 1px var(--color-primary) inset,
+    0 0 0 3px var(--focus-ring-color);
+}
+
+// ============================================================
+// 通用 section-title 样式 —— 首页各模块共享
+// ============================================================
+@mixin section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--color-primary);
+    flex-shrink: 0;
+  }
+}

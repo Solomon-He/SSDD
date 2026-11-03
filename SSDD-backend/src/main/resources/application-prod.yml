@@ -1,0 +1,7 @@
+ssdd:
+  database:
+    url: ${SSDD_DB_URL}
+  storage:
+    root: ${SSDD_DATA_DIR}
+  cors:
+    allowed-origins: ${SSDD_CORS_ALLOWED_ORIGINS:}

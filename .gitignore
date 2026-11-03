@@ -1,0 +1,33 @@
+.firecrawl/
+
+# Dependencies, generated outputs and local tools
+node_modules/
+target/
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# Private machine configuration and runtime data
+application-local.yml
+.env
+.env.*
+!.env.example
+!SSDD-frontend/.env.development
+var/
+*.log
+*.hprof
+*.jfr
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE and local repository backups
+.idea/
+.vscode/
+.local-git-backups/
+.DS_Store
+Thumbs.db
+desktop.ini

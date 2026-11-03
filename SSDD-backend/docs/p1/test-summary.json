@@ -1,0 +1,51 @@
+{
+  "status": "passed",
+  "java": "Eclipse Adoptium JDK 17.0.21",
+  "maven": "3.9.16",
+  "spring_boot": "3.5.16",
+  "mysql": "8.0.34",
+  "tests": 16.0,
+  "failures": 0.0,
+  "errors": 0.0,
+  "skipped": 0.0,
+  "suites": [
+    {
+      "name": "org.ssdd.common.WebContractTests",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.391
+    },
+    {
+      "name": "org.ssdd.config.ConfigurationValidationTests",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.08
+    },
+    {
+      "name": "org.ssdd.SsddBackendApplicationTests",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 4.756
+    }
+  ],
+  "migrations": [
+    {
+      "file": "V1__create_users_and_sessions.sql",
+      "sha256": "1a98a84b9085a92673c1627723a1682650b701725caabe49b87c8c5ef42dd5e7"
+    },
+    {
+      "file": "V2__create_v2_models.sql",
+      "sha256": "b6ea9a8b8aad9e401c104722cdd2939adefec5240eb68f4cf9e5f3917fe2b4f0"
+    },
+    {
+      "file": "V3__create_detections_and_audit.sql",
+      "sha256": "4731228ecdfbe45b9436b175675110a95b8de2673776246df553dcdcc7b89d13"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: SSDD-backend
+  profiles:
+    default: dev
+  datasource:
+    url: ${ssdd.database.url}
+    username: ${ssdd.database.username}
+    password: ${ssdd.database.password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: ssdd-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 5000
+      validation-timeout: 3000
+  flyway:
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
+  sql:
+    init:
+      mode: never
+  jackson:
+    time-zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 510MB
+      file-size-threshold: 0
+      resolve-lazily: true
+  mvc:
+    log-request-details: false
+
+server:
+  port: ${SSDD_PORT:3000}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
+  tomcat:
+    max-swallow-size: 510MB
+
+ssdd:
+  version: '@project.version@'
+  database:
+    url: ${SSDD_DB_URL:jdbc:mysql://127.0.0.1:3306/ssdd?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${SSDD_DB_USERNAME:}
+    password: ${SSDD_DB_PASSWORD:}
+  storage:
+    root: ${SSDD_DATA_DIR:./var/ssdd}
+  cors:
+    allowed-origins: []
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: input
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  info:
+    env:
+      enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  pattern:
+    level: '%5p [requestId:%X{requestId:-}]'

@@ -1,0 +1,123 @@
+@use './variables.scss';
+
+/* 全局重置 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  /* 更新为现代无衬线系统英文字体优先，配合常规中文字体 */
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5; /* 增加舒适的文本行高 */
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 优化全局文本选中的配色体验 */
+::selection {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+a:hover {
+  text-decoration: none; /* 抛弃旧版生硬下划线 */
+  opacity: 0.8;
+}
+
+/* 滚动条美化 - 向 macOS 或现代极简风看齐 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--text-placeholder);
+  border-radius: 4px;
+  border: 2px solid transparent; /* 利用透明边框形成悬浮留白 */
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* ============================
+   ElMessageBox 全局样式覆盖
+   与 SsDialog 视觉风格统一：圆角、间距、分割线、按钮
+   ============================ */
+.el-message-box {
+  border-radius: 12px;
+  padding-bottom: 0;
+
+  /* ---- 头部 ---- */
+  .el-message-box__header {
+    padding: 20px 24px 12px;
+  }
+
+  .el-message-box__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .el-message-box__headerbtn {
+    top: 20px;
+    right: 20px;
+  }
+
+  /* ---- 内容区域 ---- */
+  .el-message-box__content {
+    padding: 4px 24px 20px;
+    font-size: 14px;
+    color: var(--text-regular);
+  }
+
+  /* ---- 底部按钮区域 ---- */
+  .el-message-box__btns {
+    padding: 12px 24px 20px;
+
+    .el-button {
+      border-radius: var(--border-radius);
+      font-weight: 500;
+    }
+  }
+}
+
+// 全局覆盖 ElButton 样式，确保保持一致的圆角和字体权重
+.el-button {
+  border-radius: var(--border-radius);
+  font-weight: 500;
+}
