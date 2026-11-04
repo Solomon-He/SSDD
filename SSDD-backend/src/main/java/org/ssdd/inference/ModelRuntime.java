@@ -49,7 +49,6 @@ public class ModelRuntime {
         private final ModelRepository.ModelRow snapshot;
         private final AtomicBoolean released=new AtomicBoolean();
         private Lease(Entry entry) { this.entry=entry;this.snapshot=entry.model; }
-        private Lease(Entry entry,ModelRepository.ModelRow snapshot) {this.entry=entry;this.snapshot=snapshot;}
         public ModelRepository.ModelRow model() { return snapshot; }
         public InferenceSession.DeviceInfo device() { return entry.session.deviceInfo(); }
         public synchronized float[] run(float[] input) {
@@ -75,25 +74,6 @@ public class ModelRuntime {
                 throw ModelErrors.unavailable("活动模型状态已变化，请重新加载模型");
             active.leases++;return new Lease(active);
         } finally { gate.unlock(); }
-    }
-    /** A durable task can use its original model even after activation/metadata changes or soft deletion. */
-    public Lease acquireFrozen(ModelRepository.ModelRow snapshot,InferenceSession.DeviceInfo device,InferenceProperties settings,java.util.function.Supplier<InferenceSession> opener) {
-        try(var change=beginChange()) {
-            gate.lock();try {
-                if(closed)throw ModelErrors.unavailable("推理运行时已停止");
-                if(active!=null&&properties.equals(settings)&&active.model.id().equals(snapshot.id())&&active.model.sha256().equals(snapshot.sha256())&&active.session.deviceInfo().equals(device)) {
-                    active.leases++;return new Lease(active,snapshot);
-                }
-                requireCapacity();
-            }finally{gate.unlock();}
-            InferenceSession session=opener.get();boolean retained=false;
-            try {
-                gate.lock();try {
-                    if(closed)throw ModelErrors.unavailable("推理运行时已停止");
-                    var entry=new Entry(snapshot,session,-1);entry.retired=true;entry.leases=1;retired.add(entry);retained=true;return new Lease(entry);
-                }finally{gate.unlock();}
-            }finally{if(!retained)session.close();}
-        }
     }
 
     /** Caller performs the short DB transaction and infallible assignment while this gate excludes acquisition. */

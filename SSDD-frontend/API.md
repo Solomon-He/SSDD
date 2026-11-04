@@ -1,9 +1,9 @@
 # 钢铁表面缺陷检测系统 — API 接口文档
 
 > 基础地址：`http://localhost:3000`
-> 最后更新：2026-11-04（P5.5：异步批量任务）
+> 最后更新：2026-11-04（P5：批量、CSV、统计缓存及日志）
 >
-> 已实现认证、管理员用户、V2 模型、单图/同步及异步批量检测、历史列表/详情、签名图片、CSV、管理员统计缓存、日志及健康检查。
+> 已实现认证、管理员用户、V2 模型、单图/同步批量检测、历史列表/详情、签名图片、CSV、管理员统计缓存、日志及健康检查。异步任务尚未启用。
 
 ---
 
@@ -809,52 +809,6 @@ GET /api/detect/records/:id
 
 ---
 
-### 2.6 提交异步批量任务
-
-`POST /api/detect/tasks`，Bearer 认证，`multipart/form-data` 重复字段 `images`，1～20 张；图片格式、10 MiB/张、像素限制沿用同步检测。支持可选 `Idempotency-Key`（1～128 位 ASCII 字母、数字、点、下划线、冒号、短横线）。
-
-全部输入验证并持久化后返回 **202 Accepted**，`Location: /api/detect/tasks/{task_id}`；统一响应 `data` 与下节任务结构一致。202 表示受理，实际任务可能仍在排队。提交固定当时模型、权重摘要、预处理、运行时与实际设备；之后切换默认模型或重启不改变该任务快照。
-
-幂等键按用户与该异步接口隔离；相同键、相同顺序的文件名和文件摘要返回原任务（包括已结束任务），不同内容返回 409。同键并发提交可能先返回 409，客户端保留原键重试。同步批量的键与任务键独立。限流返回 429；待处理任务达到默认容量 8、上传暂存并发达到 2 或模型暂不可用返回 503；输入错误返回 400/413。
-
-### 2.7 查询异步任务与恢复结果
-
-`GET /api/detect/tasks/{UUID}`，Bearer 认证。普通用户仅查自己的任务，管理员可查全部；不存在或越权返回 404，无认证返回 401。
-
-```json
-{
-  "success": true,
-  "data": {
-    "task_id": "aa024891-c23a-42c5-b852-c372af684dc4",
-    "status": "running",
-    "image_count": 20,
-    "completed_images": 7,
-    "progress_percent": 35.0,
-    "attempts": 1,
-    "max_attempts": 3,
-    "model": { "id": "model-uuid", "name": "Unet++", "version": "v2" },
-    "requested_device": "auto",
-    "actual_device": "cpu",
-    "fallback_reason": "CUDA 不可用",
-    "error_code": null,
-    "created_at": "2026-11-04T10:00:00Z",
-    "updated_at": "2026-11-04T10:00:03Z",
-    "next_attempt_at": "2026-11-04T10:00:00Z",
-    "expires_at": "2026-11-04T11:00:00Z",
-    "progress_source": "redis",
-    "result": null
-  }
-}
-```
-
-状态为 `queued`、`running`、`retry_wait`、`succeeded`、`failed`。仅 `succeeded.result` 为第 2.2 节的整批结果结构（`batch_id/model/total/results`）；其余为 null，不发布部分记录。每次查询成功任务重新生成短期签名图片 URL，过期后重新查询。`completed_images` 是当前尝试的进度，重试时可能回到 0；失败任务可能保留失败前完成数，不表示这些记录已发布。
-
-MySQL 保存最终状态与恢复依据；Redis 进度默认 TTL 5 分钟，丢失、过期或连接故障时回查 MySQL，`progress_source` 为 `mysql`。这只表示进度查询可回退，认证和检测限流仍沿用其既有限流故障策略。
-
-默认最多尝试 3 次（含首次），退避基数 1 秒，单次预算 5 分钟，总任务期限 1 小时；超时会请求原生推理终止，资源等待实际退出后释放。常见安全错误码：`INPUT_MISSING/INPUT_CHANGED`、`USER_DISABLED`、`ATTEMPT_TIMEOUT/NATIVE_TIMEOUT`、`TASK_EXPIRED`、`INFERENCE_UNAVAILABLE`、`WORKER_RESTARTED`；具体失败不暴露路径或堆栈。冻结 CUDA 不可用时重试后失败，不改用 CPU；提交时 auto 已回退到 CPU 的任务恢复后继续 CPU。
-
-前端串行轮询、终态停止，连续网络查询失败 3 次后暂停并保留任务号；按账号保留最近任务号，也可从操作日志复制。暂停、离开页面和浏览器中断均不取消服务端任务；本阶段无任务取消或任务列表接口。
-
 ## 三、模型管理接口 (`/api/models`)
 
 > 所有接口需要认证。上传/激活/删除操作仅管理员可用。
@@ -1490,9 +1444,6 @@ GET /health
 | `register` | 用户注册 | `{ "role": "inspector" }` |
 | `detect` | 单张图片检测 | `{ "record_id": "...", "model_id": "...", "defect_count": 3, "actual_device": "cpu" }` |
 | `batch_detect` | 批量图片检测 | `{ "batch_id": "...", "model_id": "...", "image_count": 5, "actual_device": "cuda" }` |
-| `task_submit` | 提交异步任务 | `{ "task_id": "...", "model_id": "...", "image_count": 20, "actual_device": "cpu" }` |
-| `task_retry` | 异步任务等待重试 | `{ "task_id": "...", "attempt": 1, "error_code": "INFERENCE_UNAVAILABLE" }` |
-| `task_failed` | 异步任务失败 | `{ "task_id": "...", "attempt": 3, "error_code": "INFERENCE_UNAVAILABLE" }` |
 | `model_switch` | 兼容历史筛选值；当前改用 model_activate | `{ "model_id": "..." }` |
 | `model_activate` | 激活模型 | `{ "model_id": "...", "actual_device": "cpu" }` |
 | `model_update` | 修改模型 | `{ "model_id": "..." }` |

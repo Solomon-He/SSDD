@@ -2,7 +2,6 @@
   "name": "frontend",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@11.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +10,6 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "test:p5": "node --experimental-vm-modules tests/verify-p5-state.mjs",
-    "test:p55": "node --experimental-vm-modules tests/verify-p55-state.mjs",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
@@ -55,5 +53,6 @@
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
-  }
+  },
+  "packageManager": "pnpm@11.8.0"
 }

@@ -57,15 +57,6 @@ server:
 
 ssdd:
   version: '@project.version@'
-  tasks:
-    worker-enabled: ${SSDD_TASK_WORKER_ENABLED:true}
-    capacity: 8
-    max-attempts: 3
-    poll-interval: 500ms
-    retry-delay: 1s
-    attempt-timeout: 5m
-    max-age: 1h
-    progress-ttl: 5m
   batch:
     max-images: 20
     processing-timeout: 120s

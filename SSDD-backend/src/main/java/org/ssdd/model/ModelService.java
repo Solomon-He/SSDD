@@ -184,7 +184,6 @@ public class ModelService {
         if(!comparable.equals(parse(contract)))
             throw ModelErrors.bad("模型推理契约版本不受支持");
     }
-    public void validateTaskSnapshot(ModelRepository.ModelRow row){validateSavedContract(row);}
     private JsonNode parse(String value) {
         try { return json.readTree(value); }catch(IOException ex) { throw ModelErrors.bad("模型推理配置无效"); }
     }

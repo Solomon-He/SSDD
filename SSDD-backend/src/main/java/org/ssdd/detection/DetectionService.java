@@ -49,12 +49,7 @@ public class DetectionService {
         return execute(actor,images,key,true);
     }
     private record Validated(String name,String sha256) {}
-    public record Prepared(DetectionRepository.Row row,List<DetectionRepository.Stats> stats) {}
-    public final class Admission implements AutoCloseable {
-        private final java.util.concurrent.atomic.AtomicBoolean released=new java.util.concurrent.atomic.AtomicBoolean();
-        @Override public void close(){if(released.compareAndSet(false,true))slots.release();}
-    }
-    public Admission admitBackground(){if(!slots.tryAcquire())throw DetectionErrors.busy();return new Admission();}
+    private record Prepared(DetectionRepository.Row row,List<DetectionRepository.Stats> stats) {}
     private Map<String,Object> execute(SessionPrincipal actor,List<MultipartFile> images,String key,boolean batch) {
         if(key!=null&&!key.matches("[A-Za-z0-9._:-]{1,128}"))throw DetectionErrors.bad("Idempotency-Key 仅接受 1～128 位 ASCII 字母、数字、点、下划线、冒号和短横线");
         limiter.check(actor.userId());
@@ -116,45 +111,39 @@ public class DetectionService {
         } finally {if(admitted)slots.release();if(reservation!=null)pending.remove(reservation);}
     }
     private Prepared prepare(SessionPrincipal actor,ModelRuntime.Lease lease,DetectionImageDecoder.Image image,String key,boolean batch,String digest,long started,List<String> ids) {
-        return prepareShared(actor,lease,image,batch?null:key,digest,inference,()->budget(started,batch),ids::add);
-    }
-    public Prepared prepareTask(SessionPrincipal actor,ModelRuntime.Lease lease,DetectionImageDecoder.Image image,String digest,InferenceProperties settings,Runnable checkpoint,java.util.function.Consumer<String> registerOutput) {
-        return prepareShared(actor,lease,image,null,digest,settings,checkpoint,registerOutput);
-    }
-    private Prepared prepareShared(SessionPrincipal actor,ModelRuntime.Lease lease,DetectionImageDecoder.Image image,String key,String digest,InferenceProperties settings,Runnable checkpoint,java.util.function.Consumer<String> registerOutput) {
                 var model=lease.model();var device=lease.device();
-                float[] tensor=decoder.tensor(image.rgb());checkpoint.run();
+                float[] tensor=decoder.tensor(image.rgb());budget(started,batch);
                 var nativeResult=lease.runTimed(tensor);float[] logits=nativeResult.logits();
-                double millis=nativeResult.inferenceMillis();checkpoint.run();
-                var output=postprocessor.process(logits,image.rgb());checkpoint.run();
-                String id=UUID.randomUUID().toString();registerOutput.accept(id);var keys=files.save(id,output.images());checkpoint.run();
+                double millis=nativeResult.inferenceMillis();budget(started,batch);
+                var output=postprocessor.process(logits,image.rgb());budget(started,batch);
+                String id=UUID.randomUUID().toString();ids.add(id);var keys=files.save(id,output.images());budget(started,batch);
                 var snapshot=json.createObjectNode();
                 snapshot.set("model_contract",tree(model.inferenceConfig()));
                 snapshot.put("model_sha256",model.sha256());snapshot.put("model_id",model.id());
                 snapshot.put("model_name",model.name());snapshot.put("model_version",model.version());
                 snapshot.put("requested_device",device.requested());snapshot.put("actual_device",device.actual());
                 snapshot.put("fallback_reason",device.fallbackReason());snapshot.put("runtime_version",device.runtimeVersion());
-                snapshot.put("device_id",settings.deviceId());snapshot.put("precision","fp32");snapshot.put("use_tf32",false);
-                snapshot.put("gpu_memory_limit_bytes",settings.gpuMemoryLimitBytes());
+                snapshot.put("device_id",inference.deviceId());snapshot.put("precision","fp32");snapshot.put("use_tf32",false);
+                snapshot.put("gpu_memory_limit_bytes",inference.gpuMemoryLimitBytes());
                 snapshot.put("image_format",image.format());snapshot.put("encoded_width",image.encodedWidth());snapshot.put("encoded_height",image.encodedHeight());
                 snapshot.put("exif_orientation",image.orientation());snapshot.put("orientation_applied",true);
                 snapshot.put("resize","stretch_half_pixel_bilinear_float_rgb_v1");snapshot.put("alpha_background","#ffffff");
                 snapshot.put("mask_restore","nearest_floor_v1");snapshot.put("overlay_alpha",V2DetectionPostprocessor.ALPHA);
                 snapshot.put("region_count_space","model_1600x256");snapshot.put("pixel_count_space","oriented_original");
                 var channels=new LinkedHashMap<String,String>();for(int c=1;c<=4;c++)channels.put(Integer.toString(c),keys.get("class-"+c));
-                var row=new DetectionRepository.Row(id,actor.userId(),model.id(),key,digest,keys.get("original"),keys.get("mask"),keys.get("overlay"),
+                var row=new DetectionRepository.Row(id,actor.userId(),model.id(),batch?null:key,digest,keys.get("original"),keys.get("mask"),keys.get("overlay"),
                         encode(channels),image.rgb().getWidth(),image.rgb().getHeight(),output.totalPixels(),output.unionPixels(),output.count(),millis,
                         model.name(),model.version(),snapshot.toString(),Instant.now(),null,null,null);
                 var stats=new ArrayList<DetectionRepository.Stats>();for(int c=0;c<4;c++)stats.add(new DetectionRepository.Stats(c+1,output.components()[c],output.pixels()[c]));
                 return new Prepared(row,stats);
     }
     private JsonNode mapToNode(String id,String name,String version){return json.valueToTree(Map.of("id",id,"name",name,"version",version));}
-    public Map<String,Object> batchView(String id,String snapshot) {
+    private Map<String,Object> batchView(String id,String snapshot) {
         var saved=tree(snapshot);var rows=records.batchRows(id);var stats=records.statsFor(rows.stream().map(DetectionRepository.Row::id).toList());var results=new ArrayList<Map<String,Object>>();
         for(int i=0;i<rows.size();i++){var item=view(rows.get(i),false,stats.getOrDefault(rows.get(i).id(),List.of()));item.put("file_name",saved.path("file_names").get(i).asText());results.add(item);}
         return Map.of("batch_id",id,"model",saved.path("model"),"total",rows.size(),"results",results);
     }
-    public static String filename(String input,int index) {
+    private static String filename(String input,int index) {
         if(input==null||input.isBlank())return "image-"+(index+1);
         input=input.replace('\\','/');input=input.substring(input.lastIndexOf('/')+1).replaceAll("[\\p{Cntrl}]"," ").strip();
         return input.isBlank()?"image-"+(index+1):input.substring(0,input.offsetByCodePoints(0,Math.min(200,input.codePointCount(0,input.length()))));

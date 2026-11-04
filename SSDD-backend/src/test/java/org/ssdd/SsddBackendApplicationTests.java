@@ -48,10 +48,10 @@ class SsddBackendApplicationTests {
 
     @Test
     void createsSchemaAndRestartDoesNotRepeatMigrations() {
-        assertEquals("6", flyway.info().current().getVersion().toString());
-        assertEquals(13, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name <> 'flyway_schema_history'", Integer.class));
+        assertEquals("5", flyway.info().current().getVersion().toString());
+        assertEquals(11, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name <> 'flyway_schema_history'", Integer.class));
         assertEquals(0, flyway.migrate().migrationsExecuted);
-        assertEquals(6, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1", Integer.class));
+        assertEquals(5, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1", Integer.class));
         assertEquals("+00:00", jdbc.queryForObject("SELECT @@session.time_zone", String.class));
     }
 
@@ -69,7 +69,7 @@ class SsddBackendApplicationTests {
                 statement.executeUpdate();
             }
             Flyway latest = Flyway.configure().dataSource(upgrade.url(), upgrade.username(), upgrade.password()).cleanDisabled(true).load();
-            assertEquals(5, latest.migrate().migrationsExecuted);
+            assertEquals(4, latest.migrate().migrationsExecuted);
             try (var connection = java.sql.DriverManager.getConnection(upgrade.url(), upgrade.username(), upgrade.password());
                  var statement = connection.createStatement();
                  var rows = statement.executeQuery("SELECT COUNT(*) FROM users WHERE email='upgrade@example.test'")) {

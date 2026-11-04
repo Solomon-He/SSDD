@@ -47,16 +47,6 @@ public class OrtInferenceSessionFactory implements InferenceSessionFactory {
     }
 
     private NativeSession open(Path path, InferenceProperties.Device actual, String requested, String fallback) {
-        return open(path,actual,requested,fallback,config);
-    }
-    @Override public InferenceSession openFrozen(Path path,InferenceSession.DeviceInfo device,InferenceProperties settings) {
-        try {
-            if(!OrtEnvironment.getEnvironment().getVersion().equals(device.runtimeVersion())||!Set.of("cpu","cuda").contains(device.actual()))
-                throw ModelErrors.unavailable("任务运行时版本或设备不兼容");
-            return open(path,InferenceProperties.Device.valueOf(device.actual().toUpperCase(Locale.ROOT)),device.requested(),device.fallbackReason(),settings);
-        } catch(LinkageError unavailable) {throw ModelErrors.unavailable("推理原生运行库不可用");}
-    }
-    private NativeSession open(Path path, InferenceProperties.Device actual, String requested, String fallback,InferenceProperties settings) {
         OrtSession.SessionOptions options = null;
         OrtCUDAProviderOptions cuda = null;
         NativeSession handle = null;
@@ -71,15 +61,15 @@ public class OrtInferenceSessionFactory implements InferenceSessionFactory {
             if (actual == InferenceProperties.Device.CUDA) {
                 if (!OrtEnvironment.getAvailableProviders().contains(OrtProvider.CUDA))
                     throw ModelErrors.unavailable("当前运行工件不支持 CUDA");
-                cuda = new OrtCUDAProviderOptions(settings.deviceId());
-                cuda.add("use_tf32", "0"); cuda.add("gpu_mem_limit", Long.toString(settings.gpuMemoryLimitBytes()));
+                cuda = new OrtCUDAProviderOptions(config.deviceId());
+                cuda.add("use_tf32", "0"); cuda.add("gpu_mem_limit", Long.toString(config.gpuMemoryLimitBytes()));
                 cuda.add("arena_extend_strategy", "kSameAsRequested"); cuda.add("cudnn_conv_algo_search", "DEFAULT");
                 cuda.add("cudnn_conv_use_max_workspace", "0"); cuda.add("do_copy_in_default_stream", "1");
                 options.addCUDA(cuda);
             } else options.addCPU(true);
             var session = env.createSession(path.toString(), options);
             handle = new NativeSession(session, options, cuda,
-                    new InferenceSession.DeviceInfo(requested, actual.name().toLowerCase(Locale.ROOT), fallback, env.getVersion()),settings.runTimeout());
+                    new InferenceSession.DeviceInfo(requested, actual.name().toLowerCase(Locale.ROOT), fallback, env.getVersion()));
             validateSignature(session);
             float[] warmup = new float[INPUT_ELEMENTS];
             for (int i = 0; i < warmup.length; i++) warmup[i] = i % 256;
@@ -122,10 +112,9 @@ public class OrtInferenceSessionFactory implements InferenceSessionFactory {
         private final OrtSession.SessionOptions options;
         private final OrtCUDAProviderOptions cuda;
         private final DeviceInfo info;
-        private final java.time.Duration runTimeout;
         private final AtomicBoolean closed = new AtomicBoolean();
-        NativeSession(OrtSession session, OrtSession.SessionOptions options, OrtCUDAProviderOptions cuda, DeviceInfo info,java.time.Duration runTimeout) {
-            this.session=session; this.options=options; this.cuda=cuda; this.info=info;this.runTimeout=runTimeout;
+        NativeSession(OrtSession session, OrtSession.SessionOptions options, OrtCUDAProviderOptions cuda, DeviceInfo info) {
+            this.session=session; this.options=options; this.cuda=cuda; this.info=info;
         }
         @Override public DeviceInfo deviceInfo() { return info; }
         @Override public float[] run(float[] values) { return run(values,false).logits(); }
@@ -134,7 +123,7 @@ public class OrtInferenceSessionFactory implements InferenceSessionFactory {
             if (values == null || values.length != INPUT_ELEMENTS) throw ModelErrors.bad("推理输入尺寸错误");
             if (closed.get()) throw ModelErrors.unavailable("推理 Session 已关闭");
             try {
-                boolean acquired=warmup?slots.tryAcquire(runTimeout.toMillis(),TimeUnit.MILLISECONDS):slots.tryAcquire();
+                boolean acquired=warmup?slots.tryAcquire(config.runTimeout().toMillis(),TimeUnit.MILLISECONDS):slots.tryAcquire();
                 if(!acquired)throw ModelErrors.busy();
             } catch(InterruptedException ex) { Thread.currentThread().interrupt();throw ModelErrors.busy(); }
             try {
@@ -151,7 +140,7 @@ public class OrtInferenceSessionFactory implements InferenceSessionFactory {
                                 try { runOptions.setTerminate(true); } catch (OrtException ignored) { }
                             }
                         }
-                    }, runTimeout.toMillis(), TimeUnit.MILLISECONDS);
+                    }, config.runTimeout().toMillis(), TimeUnit.MILLISECONDS);
                     long nativeStart=System.nanoTime();
                     try (var output = session.run(Map.of("input", input), runOptions)) {
                         double nativeMillis=(System.nanoTime()-nativeStart)/1_000_000.0;

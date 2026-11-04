@@ -24,8 +24,6 @@ public class AuditService {
     public void failure(String action,Map<String,?> details) { write(null,action,"failure",details); }
     @Transactional(propagation=Propagation.REQUIRES_NEW)
     public void failure(String userId,String action,Map<String,?> details) { write(userId,action,"failure",details); }
-    @Transactional(propagation=Propagation.MANDATORY)
-    public void taskFailure(String userId,String action,Map<String,?> details){write(userId,action,"failure",details);}
     private void write(String userId,String action,String status,Map<String,?> details) {
         try {
             String requestId=MDC.get("requestId");
@@ -34,7 +32,7 @@ public class AuditService {
                 var request=attributes.getRequest();ip=request.getRemoteAddr();agent=request.getHeader("User-Agent");
                 if(agent!=null){agent=agent.replaceAll("[\\p{Cntrl}]"," ");agent=agent.substring(0,Math.min(512,agent.length()));}
             }
-            String target=null;for(String key:java.util.List.of("task_id","record_id","batch_id","model_id","target_user_id"))if(details.get(key) instanceof String value&&value.length()<=64){target=value;break;}
+            String target=null;for(String key:java.util.List.of("record_id","batch_id","model_id","target_user_id"))if(details.get(key) instanceof String value&&value.length()<=64){target=value;break;}
             jdbc.update("INSERT INTO operation_logs(id,user_id,action,status,details,request_id,ip_address,user_agent,target_id) VALUES(?,?,?,?,?,?,?,?,?)",
                     UUID.randomUUID().toString(),userId,action,status,json.writeValueAsString(details),
                     requestId==null?UUID.randomUUID().toString():requestId,ip,agent,target);

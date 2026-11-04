@@ -1,6 +1,6 @@
 # SSDD 前端 · 钢铁表面缺陷检测系统
 
-基于 Vue 3 和 TypeScript 的前后端分离应用，提供登录注册、缺陷检测、检测历史、统计图表、模型管理和用户管理等页面。当前分支还包含异步批量检测与任务进度查询。
+基于 Vue 3 和 TypeScript 的前后端分离应用，提供登录注册、单张与同步批量缺陷检测、检测历史、统计图表、模型管理和用户管理等页面。`main` 保持 P0～P5 功能范围，异步批量检测与任务进度查询在 `async-batch` 分支提供。
 
 前端通过 HTTP 接口调用 `SSDD-backend`，模型推理、数据库和文件存储均由后端负责。完整系统的初始化步骤见[根目录 README](../README.md)，接口约定见 [API.md](./API.md)。
 
@@ -123,7 +123,6 @@ pnpm preview --host localhost --port 5173 --strictPort
 | `pnpm preview` | 本地预览已生成的 `dist/` |
 | `pnpm type-check` | 单独执行 Vue / TypeScript 类型检查 |
 | `pnpm test:p5` | 验证同步批量等前端状态行为 |
-| `pnpm test:p55` | 验证异步批量任务状态行为 |
 | `pnpm lint` | 执行 Oxlint 与 ESLint，包含自动修复，会修改文件 |
 | `pnpm format` | 使用 Prettier 格式化 `src/`，会修改文件 |
 
@@ -134,7 +133,7 @@ src/
 ├── api/           # HTTP 请求封装与业务接口
 ├── assets/        # 图片、主题和全局样式
 ├── components/    # 通用组件、图表和布局
-├── composables/   # 可复用页面逻辑与任务轮询
+├── composables/   # 可复用页面逻辑
 ├── constants/     # 缺陷类型、日志动作等常量
 ├── router/        # 路由配置与访问控制
 ├── stores/        # Pinia 状态管理

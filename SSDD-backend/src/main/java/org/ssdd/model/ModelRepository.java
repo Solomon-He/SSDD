@@ -51,6 +51,6 @@ public class ModelRepository {
     }
     public void softDelete(String id) { jdbc.update("UPDATE model_versions SET deleted_at=UTC_TIMESTAMP(6) WHERE id=?",id); }
     public boolean referenced(String id) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM detection_records WHERE model_id=?) OR EXISTS(SELECT 1 FROM detection_batches WHERE model_id=?) OR EXISTS(SELECT 1 FROM detection_tasks WHERE model_id=?)",Boolean.class,id,id,id));
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM detection_records WHERE model_id=?) OR EXISTS(SELECT 1 FROM detection_batches WHERE model_id=?)",Boolean.class,id,id));
     }
 }
