@@ -1,0 +1,8 @@
+{
+  "contract_version": "ssdd-v2-2026-11-03",
+  "arch_version": "v2",
+  "input": {"name":"input","dtype":"float32","layout":"NCHW","color_order":"RGB","range":[0,255],"shape":[1,3,256,1600],"embedded_normalization":true},
+  "output": {"name":"output","dtype":"float32","layout":"NCHW","shape":[1,4,256,1600],"kind":"logits"},
+  "postprocess": {"thresholds":[0.5,0.5,0.5,0.5],"operator":">=","connectivity":8,"min_component_pixels":150,"min_class_pixels":[600,600,900,2000]},
+  "tta": false
+}

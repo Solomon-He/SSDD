@@ -8,6 +8,7 @@ import ModelInfoCard from './components/ModelInfoCard.vue'
 import SingleResult from './components/SingleResult.vue'
 import BatchResult from './components/BatchResult.vue'
 import BatchVisuDialog from './components/BatchVisuDialog.vue'
+import AsyncTaskPanel from './components/AsyncTaskPanel.vue'
 
 const detectStore = useDetectStore()
 const modelsStore = useModelsStore()
@@ -16,7 +17,7 @@ const uploadRef = ref<InstanceType<typeof UploadArea> | null>(null)
 const batchVisuRef = ref<InstanceType<typeof BatchVisuDialog> | null>(null)
 
 /** 检测模式：single / batch */
-const mode = ref<'single' | 'batch'>('single')
+const mode = ref<'single' | 'batch' | 'async'>('single')
 
 /** 活跃模型信息（用于上传前展示，优先使用检测结果中的模型） */
 const activeModelInfo = computed<DetectModelInfo | null>(() => {
@@ -27,7 +28,7 @@ const activeModelInfo = computed<DetectModelInfo | null>(() => {
 })
 
 /** 切换模式时清除结果和文件 */
-function switchMode(newMode: 'single' | 'batch') {
+function switchMode(newMode: 'single' | 'batch' | 'async') {
   mode.value = newMode
   detectStore.clearResults()
   uploadRef.value?.clearFiles()
@@ -59,19 +60,16 @@ onMounted(() => modelsStore.fetchModels())
       <p class="page-desc">上传钢铁表面图片，系统将自动进行缺陷语义分割检测</p>
     </div>
 
-    <div class="page-body">
+    <ElRadioGroup :model-value="mode" @update:model-value="switchMode($event as 'single' | 'batch' | 'async')">
+      <ElRadioButton value="single">单张检测</ElRadioButton>
+      <ElRadioButton value="batch">同步批量</ElRadioButton>
+      <ElRadioButton value="async">异步批量</ElRadioButton>
+    </ElRadioGroup>
+    <AsyncTaskPanel v-if="mode === 'async'" />
+    <div v-else class="page-body">
       <!-- 左侧：上传 + 模型信息 -->
       <div class="left-panel">
         <!-- 模式切换 -->
-        <div class="mode-switch">
-          <ElRadioGroup
-            :model-value="mode"
-            @update:model-value="switchMode($event as 'single' | 'batch')"
-          >
-            <ElRadioButton value="single">单张检测</ElRadioButton>
-            <ElRadioButton value="batch">批量检测</ElRadioButton>
-          </ElRadioGroup>
-        </div>
 
         <!-- 上传区域 -->
         <UploadArea

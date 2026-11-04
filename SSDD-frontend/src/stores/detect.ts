@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import type { DetectResult, BatchDetectData, DetectModelInfo } from '@/types/detect'
 import { detectImage, detectBatch } from '@/api/detect'
 import { ElMessage } from 'element-plus'
+import { invalidateHomeData } from '@/composables/useHomeData'
 
 export const useDetectStore = defineStore('detect', () => {
   // ---- State ----
@@ -37,6 +38,7 @@ export const useDetectStore = defineStore('detect', () => {
       if (res.success && res.data) {
         currentResult.value = res.data
         batchData.value = null
+        invalidateHomeData()
         ElMessage.success('检测完成')
       }
     } catch (e: unknown) {
@@ -68,6 +70,7 @@ export const useDetectStore = defineStore('detect', () => {
       if (res.success && res.data) {
         batchData.value = res.data
         currentResult.value = null
+        invalidateHomeData()
         ElMessage.success(`批量检测完成，共 ${res.data.total} 张`)
       }
     } catch (e: unknown) {

@@ -23,8 +23,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = HealthController.class, properties = {
+@WebMvcTest(controllers = HealthController.class, excludeAutoConfiguration = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration.class}, properties = {
         "ssdd.version=test", "ssdd.database.username=unused", "ssdd.database.password=unused",
+        "ssdd.auth.signing-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "ssdd.cors.allowed-origins[0]=http://localhost:5173",
         "logging.level.org.ssdd.common.exception.GlobalExceptionHandler=OFF"})
 @Import({WebContractTests.ContractController.class, GlobalExceptionHandler.class,

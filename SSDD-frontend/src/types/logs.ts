@@ -7,11 +7,13 @@ export interface LogUser {
 /** 操作日志项 */
 export interface LogEntry {
   id: string
-  user_id: string
+  user_id: string | null
   action: string
   details: Record<string, unknown>
-  ip_address: string
-  user_agent: string
+  ip_address: string | null
+  user_agent: string | null
+  request_id: string
+  target_id: string | null
   status: 'success' | 'failure'
   created_at: string
   user: LogUser

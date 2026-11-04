@@ -110,7 +110,7 @@ defineExpose({ open })
             拖拽文件到此处，或 <em>点击上传</em>
           </div>
           <template #tip>
-            <div class="el-upload__tip">仅支持 .onnx 格式，最大 500MB</div>
+            <div class="el-upload__tip">支持 V2 四通道、内嵌权重的 .onnx 文件，最大 500MiB</div>
           </template>
         </ElUpload>
       </template>

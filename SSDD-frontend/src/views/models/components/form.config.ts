@@ -148,7 +148,7 @@ export const editModelMetricConfig: SsFormItemConfig[] = [
   },
   {
     prop: 'file_size',
-    label: '文件大小 (MB)',
+    label: '文件大小 (MiB)',
     comp: 'ElInputNumber',
     compProps: {
       min: 0,
@@ -157,6 +157,7 @@ export const editModelMetricConfig: SsFormItemConfig[] = [
       controls: false,
       placeholder: 'MB',
       class: 'metric-input',
+      disabled: true,
     },
     rules: [
       {
@@ -167,5 +168,11 @@ export const editModelMetricConfig: SsFormItemConfig[] = [
         trigger: 'blur',
       },
     ],
+  },
+  {
+    prop: 'metric_source',
+    label: '指标来源',
+    comp: SsInput,
+    compProps: { placeholder: '填写指标时，请说明验证集或测量方式', maxlength: 255 },
   },
 ]

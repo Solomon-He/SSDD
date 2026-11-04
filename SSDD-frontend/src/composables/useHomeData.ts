@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getRecords } from '@/api/detect'
 import { getAdminStats } from '@/api/admin'
@@ -8,10 +8,17 @@ import type { SystemStats } from '@/types/admin'
 import type { Model } from '@/types/model'
 
 /** 缓存有效期（毫秒） */
-const CACHE_TTL = 5 * 60 * 1000
+const CACHE_TTL = 30 * 1000
 
 // ---- 模块级缓存（跨组件实例共享） ----
 let lastFetchTime = 0
+let cachedScope = ''
+let fetchGeneration = 0
+
+export function invalidateHomeData() {
+  lastFetchTime = 0
+  fetchGeneration++
+}
 
 const loading = ref(true)
 const myRecords = ref<DetectRecord[]>([])
@@ -27,6 +34,17 @@ const activeModel = ref<Model | null>(null)
  */
 export function useHomeData() {
   const auth = useAuthStore()
+  watch(() => `${auth.user?.id ?? ''}:${auth.userRole}`, (scope) => {
+    if (scope === cachedScope) return
+    cachedScope = scope
+    invalidateHomeData()
+    myRecords.value = []
+    myTotal.value = 0
+    chartRecords.value = []
+    adminStats.value = null
+    activeModel.value = null
+    loading.value = false
+  }, { immediate: true })
 
   /** 基于 chartRecords（全量）计算的平均缺陷数 */
   function avgDefectCount(): number {
@@ -46,6 +64,8 @@ export function useHomeData() {
     // TTL 内且非强制 → 跳过
     if (!force && Date.now() - lastFetchTime < CACHE_TTL && lastFetchTime > 0) return
 
+    const generation = ++fetchGeneration
+
     loading.value = true
     try {
       const myParams: Record<string, unknown> = { page: 1, pageSize: 50 }
@@ -64,6 +84,7 @@ export function useHomeData() {
         modelsReq.catch(() => null),
         statsReq?.catch(() => null) ?? Promise.resolve(null),
       ])
+      if (generation !== fetchGeneration) return
 
       if (myRes?.data?.success && myRes.data.data) {
         myRecords.value = myRes.data.data.items
@@ -81,7 +102,7 @@ export function useHomeData() {
 
       lastFetchTime = Date.now()
     } finally {
-      loading.value = false
+      if (generation === fetchGeneration) loading.value = false
     }
   }
 

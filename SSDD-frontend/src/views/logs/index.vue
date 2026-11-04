@@ -37,7 +37,9 @@ function buildFilterParams(): LogFilterParams {
     search: isAdmin.value ? params.search || undefined : undefined,
     role: isAdmin.value ? (params.role as LogFilterParams['role']) || undefined : undefined,
     startDate: params.dateRange?.[0] || undefined,
-    endDate: params.dateRange?.[1] || undefined,
+    endDate: params.dateRange?.[1]
+      ? new Date(new Date(params.dateRange[1]).setHours(23, 59, 59, 999)).toISOString()
+      : undefined,
   }
 }
 

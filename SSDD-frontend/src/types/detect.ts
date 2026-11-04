@@ -32,6 +32,14 @@ export interface DetectResultBase {
   defect_class_counts: DefectClassCounts
   defect_info: DefectInfo
   inference_time_ms: number
+  channel_mask_urls?: Record<string, string>
+  inference_config_snapshot?: {
+    actual_device: 'cpu' | 'cuda'
+    requested_device: 'cpu' | 'cuda' | 'auto'
+    fallback_reason: string | null
+    runtime_version: string
+    model_sha256: string
+  }
 }
 
 /** 单张检测结果 */
@@ -46,6 +54,7 @@ export interface BatchDetectItem extends DetectResultBase {
 
 /** 批量检测响应 data */
 export interface BatchDetectData {
+  batch_id: string
   model: DetectModelInfo
   total: number
   results: BatchDetectItem[]

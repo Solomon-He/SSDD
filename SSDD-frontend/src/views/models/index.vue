@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useModelsStore } from '@/stores/models'
+import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
 import type { Model } from '@/types/model'
 import UploadModelDialog from './components/UploadModelDialog.vue'
 import EditModelDialog from './components/EditModelDialog.vue'
 
 const modelsStore = useModelsStore()
+const authStore = useAuthStore()
 const uploadDialogRef = ref<InstanceType<typeof UploadModelDialog> | null>(null)
 const editDialogRef = ref<InstanceType<typeof EditModelDialog> | null>(null)
 
@@ -30,7 +32,7 @@ async function handleActivate(model: Model) {
 async function handleDelete(model: Model) {
   try {
     await ElMessageBox.confirm(
-      `确认删除模型「${model.name}」(${model.version})？此操作不可撤销，模型文件将被永久移除。`,
+      `确认删除模型「${model.name}」(${model.version})？历史检测记录会保留。`,
       '删除模型',
       { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'error' },
     )
@@ -61,11 +63,22 @@ function fmtPercent(val: number | null) {
         <h2 class="page-title">模型管理</h2>
         <p class="page-desc">管理系统中的 ONNX 推理模型，同一时刻仅可激活一个模型</p>
       </div>
-      <ElButton type="primary" @click="uploadDialogRef?.open()">
+      <ElButton v-if="authStore.isAdmin" type="primary" @click="uploadDialogRef?.open()">
         <ElIcon><Plus /></ElIcon>
         上传模型
       </ElButton>
     </div>
+
+    <ElAlert
+      v-if="modelsStore.runtime"
+      :type="modelsStore.runtime.ready ? 'success' : 'warning'"
+      :closable="false"
+      :title="modelsStore.runtime.ready
+        ? `推理模型已就绪 · ${modelsStore.runtime.actual_device?.toUpperCase()}`
+        : '推理模型尚未就绪，请激活可用模型'"
+      :description="modelsStore.runtime.fallback_reason ? '当前使用 CPU 运行，GPU 初始化未成功。' : undefined"
+      show-icon
+    />
 
     <!-- Model List -->
     <div v-loading="modelsStore.loading" class="model-list">
@@ -82,11 +95,13 @@ function fmtPercent(val: number | null) {
               size="small"
               effect="light"
             >
-              {{ model.status === 'active' ? '运行中' : '未激活' }}
+              {{ model.status === 'active' ? '已激活' : '未激活' }}
             </ElTag>
           </div>
           <span class="model-card__version">v{{ model.version }}</span>
         </div>
+
+        <p v-if="model.metric_source" class="model-card__desc">指标来源：{{ model.metric_source }}</p>
 
         <p v-if="model.description" class="model-card__desc">{{ model.description }}</p>
 
@@ -114,7 +129,7 @@ function fmtPercent(val: number | null) {
           </div>
           <div class="metric-item">
             <span class="metric-label">文件大小</span>
-            <span class="metric-value">{{ fmtMetric(model.file_size, 'MB', 2) }}</span>
+            <span class="metric-value">{{ fmtMetric(model.file_size, 'MiB', 2) }}</span>
           </div>
         </div>
 
@@ -124,7 +139,7 @@ function fmtPercent(val: number | null) {
             <span>文件：{{ model.file_name }}</span>
             <span>上传于 {{ formatDateTime(model.created_at) }}</span>
           </div>
-          <div class="model-card__actions">
+          <div v-if="authStore.isAdmin" class="model-card__actions">
             <ElButton
               text
               size="small"
@@ -133,7 +148,7 @@ function fmtPercent(val: number | null) {
               编辑
             </ElButton>
             <ElButton
-              v-if="model.status !== 'active'"
+              v-if="model.status !== 'active' || modelsStore.runtime?.ready === false"
               type="primary"
               text
               size="small"
@@ -150,7 +165,7 @@ function fmtPercent(val: number | null) {
             >
               删除
             </ElButton>
-            <ElTooltip v-if="model.status === 'active'" content="当前激活模型不可操作" placement="top">
+            <ElTooltip v-if="model.status === 'active'" content="当前激活模型不可删除" placement="top">
               <span class="active-hint">当前使用中</span>
             </ElTooltip>
           </div>

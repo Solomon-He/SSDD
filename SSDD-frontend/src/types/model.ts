@@ -6,8 +6,12 @@ export interface Model {
   id: string
   name: string
   version: string
+  arch_version: 'v2'
   file_name: string
   file_path: string
+  file_sha256: string
+  file_size_bytes: number
+  metric_source: string | null
   num_classes: number
   description: string
   status: ModelStatus
@@ -46,5 +50,15 @@ export interface UpdateModelParams {
   recall?: number | null
   dice?: number | null
   fps?: number | null
-  file_size?: number | null
+  metric_source?: string | null
+}
+
+export interface ModelRuntime {
+  ready: boolean
+  active_model_id: string | null
+  state_version: number
+  requested_device: 'cpu' | 'cuda' | 'auto'
+  actual_device: 'cpu' | 'cuda' | null
+  fallback_reason: string | null
+  error_code: string | null
 }

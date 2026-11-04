@@ -27,6 +27,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<ApiResponse<Void>> business(BusinessException ex) {
+        if (ex instanceof org.ssdd.ratelimit.RateLimitException limited) {
+            return ResponseEntity.status(ex.getStatus()).header("Retry-After",Long.toString(limited.retryAfter()))
+                    .body(ApiResponse.failure(ex.getMessage()));
+        }
         return ResponseEntity.status(ex.getStatus()).body(ApiResponse.failure(ex.getMessage()));
     }
 

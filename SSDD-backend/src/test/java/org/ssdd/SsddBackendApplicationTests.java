@@ -22,7 +22,9 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIf("mysqlAvailable")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "ssdd.bootstrap-admin.enabled=false",
+        "ssdd.auth.signing-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="})
 @Transactional
 class SsddBackendApplicationTests {
     private static MySqlTestDatabase database;
@@ -46,10 +48,10 @@ class SsddBackendApplicationTests {
 
     @Test
     void createsSchemaAndRestartDoesNotRepeatMigrations() {
-        assertEquals("3", flyway.info().current().getVersion().toString());
-        assertEquals(10, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name <> 'flyway_schema_history'", Integer.class));
+        assertEquals("6", flyway.info().current().getVersion().toString());
+        assertEquals(13, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name <> 'flyway_schema_history'", Integer.class));
         assertEquals(0, flyway.migrate().migrationsExecuted);
-        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1", Integer.class));
+        assertEquals(6, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success=1", Integer.class));
         assertEquals("+00:00", jdbc.queryForObject("SELECT @@session.time_zone", String.class));
     }
 
@@ -67,7 +69,7 @@ class SsddBackendApplicationTests {
                 statement.executeUpdate();
             }
             Flyway latest = Flyway.configure().dataSource(upgrade.url(), upgrade.username(), upgrade.password()).cleanDisabled(true).load();
-            assertEquals(2, latest.migrate().migrationsExecuted);
+            assertEquals(5, latest.migrate().migrationsExecuted);
             try (var connection = java.sql.DriverManager.getConnection(upgrade.url(), upgrade.username(), upgrade.password());
                  var statement = connection.createStatement();
                  var rows = statement.executeQuery("SELECT COUNT(*) FROM users WHERE email='upgrade@example.test'")) {
@@ -157,9 +159,9 @@ class SsddBackendApplicationTests {
         assertEquals(HttpStatus.OK, openapi.getStatusCode());
         assertTrue(((Map<?, ?>) openapi.getBody().get("paths")).containsKey("/health"));
         var missing = http.getForEntity("/api/not-implemented", Map.class);
-        assertEquals(HttpStatus.NOT_FOUND, missing.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, missing.getStatusCode());
         assertEquals(false, missing.getBody().get("success"));
-        assertEquals("资源不存在", missing.getBody().get("error"));
+        assertEquals("未认证或会话已过期", missing.getBody().get("error"));
     }
 
     private String insertUser(String email) {

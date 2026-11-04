@@ -174,7 +174,10 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await authApi.changePassword({ oldPassword, newPassword })
       const { data } = res
       if (data.success) {
-        ElMessage.success('密码修改成功')
+        clearAuthState()
+        ElMessage.success('密码修改成功，请重新登录')
+        const { default: router } = await import('@/router')
+        await router.replace('/login')
         return true
       }
       ElMessage.error(data.error || '密码修改失败')

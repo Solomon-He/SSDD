@@ -14,7 +14,7 @@ public class OpenApiConfiguration {
     public OpenAPI ssddOpenApi(@Value("${ssdd.version}") String version) {
         return new OpenAPI()
                 .info(new Info().title("SSDD 后端接口").version(version)
-                        .description("钢铁表面缺陷检测系统，仅支持 V2 模型。P1 只提供基础设施与健康检查。"))
+                        .description("钢铁表面缺陷检测系统，仅支持 V2 模型。已实现账号权限、模型管理、CPU/CUDA 单张与同步批量检测、历史与签名资源、CSV 导出、管理员统计缓存及操作日志。"))
                 .components(new Components().addSecuritySchemes("bearerAuth",
                         new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
     }

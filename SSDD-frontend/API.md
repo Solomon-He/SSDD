@@ -1,7 +1,9 @@
 # 钢铁表面缺陷检测系统 — API 接口文档
 
 > 基础地址：`http://localhost:3000`
-> 最后更新：2026-11-03（P0：仅支持 V2，模型与后处理契约已核实）
+> 最后更新：2026-11-04（P5.5：异步批量任务）
+>
+> 已实现认证、管理员用户、V2 模型、单图/同步及异步批量检测、历史列表/详情、签名图片、CSV、管理员统计缓存、日志及健康检查。
 
 ---
 
@@ -73,8 +75,12 @@ Authorization: Bearer <access_token>
 | 401 | 未认证 / Token 无效或过期 |
 | 403 | 权限不足（角色不满足要求） |
 | 404 | 资源不存在 |
+| 409 | 资源冲突（例如邮箱已注册） |
+| 429 | 认证请求超频或账号处于冷却，响应头 `Retry-After` 为等待秒数 |
 | 503 | 服务不可用（如推理引擎未就绪） |
 | 500 | 服务器内部错误 |
+
+P2 认证默认限制（均可配置）：15 分钟内每 IP 登录 60 次、注册 10 次、刷新 120 次，每账号登录 20 次；累计 5 次凭据失败冷却 15 分钟，成功登录清除失败计数。仅使用直接连接 IP，忽略客户端 Forwarded/X-Forwarded-For。Redis 不可用时上述入口返回 503 `限流服务暂不可用`，基础存活不受影响。
 
 ### 图片 URL 说明
 
@@ -102,7 +108,7 @@ POST /api/auth/register
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | email | string | ✅ | 用户邮箱 |
-| password | string | ✅ | 密码 |
+| password | string | ✅ | 至少 6 个字符，UTF-8 编码不超过 72 字节 |
 | displayName | string | ❌ | 显示名称（默认取邮箱 @ 前缀） |
 
 **成功响应** `201`:
@@ -113,11 +119,11 @@ POST /api/auth/register
   "data": {
     "userId": "uuid-string"
   },
-  "message": "注册成功，请查收验证邮件并点击链接完成邮箱确认"
+  "message": "注册成功，请登录"
 }
 ```
 
-> **注意**：注册后 Supabase 会自动发送验证邮件到用户邮箱，用户需点击邮件中的确认链接后才能登录。前端应在注册成功后提示用户查收邮件。
+> 本地账号体系，注册后可直接登录，不发送验证邮件。邮箱会去除首尾空白并转为小写；只能注册 `inspector`，客户端不能指定管理员角色。重复邮箱返回 409。
 
 **失败响应** `400`:
 
@@ -187,14 +193,7 @@ POST /api/auth/login
 }
 ```
 
-或邮箱未验证时：
-
-```json
-{
-  "success": false,
-  "error": "邮箱尚未验证，请先查收验证邮件并点击确认链接"
-}
-```
+> 停用账号也返回相同的凭据错误。登录、注册、刷新为公开接口，不使用传入的 Bearer Token。
 
 ---
 
@@ -244,6 +243,8 @@ POST /api/auth/refresh
 > - 刷新成功后需同时更新本地存储的 `access_token` 和 `refresh_token`（每次刷新会签发新的 refresh_token，旧的失效）
 > - 当 `access_token` 过期（通过 `expires_at` 判断）时调用此接口，实现静默续期
 > - 若 `refresh_token` 也已失效，返回 401，前端应跳转到登录页
+> - 默认访问令牌 15 分钟、稳定会话 7 天；刷新轮换不延长稳定会话总寿命
+> - 旧刷新令牌重复使用会撤销整个所属会话，已经签发的访问令牌也随之失效；同一令牌的并发请求只允许一次轮换，另一请求触发撤销。前端同一页面共用进行中的刷新请求；多标签页并发刷新仍需避免，跨标签协调暂未实现
 
 **失败响应** `400`:
 
@@ -280,14 +281,14 @@ PUT /api/auth/password
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | oldPassword | string | ✅ | 当前密码 |
-| newPassword | string | ✅ | 新密码（≥6 位） |
+| newPassword | string | ✅ | 新密码（≥6 个字符，UTF-8 ≤72 字节） |
 
 **成功响应** `200`:
 
 ```json
 {
   "success": true,
-  "message": "密码修改成功"
+  "message": "密码修改成功，请重新登录"
 }
 ```
 
@@ -295,13 +296,15 @@ PUT /api/auth/password
 
 | 状态码 | 原因 |
 |--------|------|
-| 400 | 旧密码和新密码为必填项 / 新密码长度不能少于 6 位 / 新密码不能与旧密码相同 |
-| 401 | 旧密码验证失败 |
+| 400 | 参数错误 / 当前密码错误 / 新旧密码相同 / UTF-8 超过 72 字节 |
+| 401 | 未认证或会话已过期 |
 | 500 | 服务器内部错误 |
 
 ---
 
 ### 1.5 用户登出
+
+撤销当前稳定会话，其他设备会话保留；改密则撤销该用户全部会话。受保护请求重新查询数据库中的账号状态、会话及角色，权限变更在后续请求中生效。
 
 ```
 POST /api/auth/logout
@@ -337,7 +340,7 @@ PUT /api/auth/profile
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | displayName | string | ❌ | 新的显示名称（不能为空字符串） |
-| avatarUrl | string \| null | ❌ | 新的头像 URL（传 `null` 或空字符串可清除头像） |
+| avatarUrl | string \| null | ❌ | http/https 外部 URL 或自己的当前受管 URL；`null`/空字符串清除，缺省保持原值 |
 
 > 至少提供一个字段，仅更新传入的字段，未传入的字段保持不变。
 
@@ -390,8 +393,9 @@ POST /api/auth/avatar
 - 支持格式：`image/jpeg`, `image/png`, `image/webp`, `image/gif`
 
 > **行为说明**：
-> - 头像保存到服务器本地 `uploads/avatars/` 目录
-> - 自动删除用户旧的本地头像文件（如有）
+> - 校验实际格式和解码内容；最大 2 MiB，边长 ≤4096、总像素 ≤1600 万
+> - GIF/WebP 只取首帧，统一缩放至最长边 512 的静态 PNG，存储于 `SSDD_DATA_DIR/avatars/`
+> - 公开 URL `/uploads/avatars/{服务端生成的文件名}.png`；数据库提交后删除自己的旧头像，数据库更新失败补偿删除新文件
 > - 自动更新 `profiles.avatar_url` 字段
 
 **成功响应** `200`:
@@ -481,8 +485,10 @@ POST /api/detect
 | image | File | ✅ | 图片文件（支持 JPEG/PNG/BMP） |
 
 **文件限制**:
-- 最大文件大小：由环境变量 `MAX_FILE_SIZE` 控制（默认 10MB）
-- 支持格式：`image/jpeg`, `image/png`, `image/bmp`
+- 最大文件大小：由环境变量 `MAX_FILE_SIZE` 控制（字节，默认 10485760，即 10 MiB，只可调小）；默认最多 800 万像素、单边 8192。
+- 支持实际解码格式 JPEG/PNG/BMP；扩展名及 MIME 不是格式证据。JPEG 应用 EXIF 方向，PNG/BMP 按编码方向，透明像素在白底合成；保存的原图为去元数据 RGB PNG。
+- 可选请求头 `Idempotency-Key`：1～128 位 ASCII 字母、数字、点、下划线、冒号、短横线；按用户及原始上传字节 SHA-256 比较。同内容重试返回同一记录与新签名，不同内容或同键处理中返回 409。前端对同一 File 对象失败/取消后的重试保留键，确认成功后下次操作生成新键。
+- 每用户默认每分钟 10 次；429 带 Retry-After，Redis 故障 503。流水线默认并发 1，繁忙立即 503；总预算 30 秒，超时 504，资源等待实际原生调用结束后释放。
 
 **成功响应** `200`:
 
@@ -537,17 +543,24 @@ POST /api/detect
 | `defect_info.defect_ratio` | 缺陷面积占比 |
 | `defect_info.class_distribution` | 各类别像素数分布 |
 | `inference_time_ms` | 模型推理耗时（毫秒） |
+| `channel_mask_urls` | 新增：key=1～4 的无损二值 PNG 短期签名链接，像素为 0/255 |
+| `inference_config_snapshot` | 新增：模型契约、SHA、预处理、原始方向、设备/provider/回退、运行时、FP32 配置快照 |
+
+图片 URL 实际形如 `/uploads/results/{record UUID}/mask.png?expires=...&signature=...`。详情和列表先检查记录权限，再生成最长 15 分钟签名；图片路由验证签名及数据库资源引用，无需 Bearer。返回 image/png 与 Cache-Control:no-store，链接过期后重新查询详情。数据库只存储稳定存储键，日志不记录完整签名 URL。
 
 > **V2 推理契约**：输入为 RGB、float32、NCHW、`[1,3,256,1600]`，数值范围 `[0,255]`。现有模型内置归一化，后端不可再次 `/255` 或 mean/std 标准化。输出为四通道 logits，图外执行 sigmoid → `>=0.5` → 8 邻域小区域过滤（面积至少 150 像素）→ 类别总面积过滤（至少 `[600,600,900,2000]`）。面积阈值在 256×1600 模型空间执行，随后用最近邻恢复到原图；返回像素数按原图空间统计，区域数量沿用过滤后的模型空间计数。
 >
-> 四类掩码可以重叠，因此 `class_distribution` 的和可能大于 `defect_pixels`。类别预览和叠加图在重叠位置选择最高概率类别，相同概率时选择较小类别索引，不能用于反推完整多标签结果。当前基线为单次推理，不包含 TTA。
+> 四类掩码可以重叠，因此 `class_distribution` 的和可能大于 `defect_pixels`。类别预览和叠加图在重叠位置选择最高 logit（与数学概率单调等价），相同值时选择较小类别索引；叠加透明度 0.45，不能用于反推完整多标签结果。非原尺寸使用 half-pixel RGB float32 双线性拉伸，掩码使用 nearest-floor 恢复。当前基线为单次推理，不包含 TTA。
 
 **失败响应**:
 
 | 状态码 | 原因 |
 |--------|------|
-| 400 | 未上传图片文件 |
+| 400 | 缺少/非法图片、格式/尺寸/大小不符或幂等键非法 |
+| 409 | 幂等内容冲突或同键处理中 |
+| 429 | 超过用户提交频率 |
 | 503 | 推理引擎未就绪（未激活模型） |
+| 504 | 原生推理或总处理预算超时 |
 | 500 | 检测或保存过程中出现异常 |
 
 ---
@@ -565,6 +578,10 @@ POST /api/detect/batch
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | images | File[] | ✅ | 多个图片文件（最多 20 张） |
+
+每张沿用单图格式/10 MiB/像素限制。先验证全部图片，再用同一模型及设备快照逐张处理；批次、记录、分类统计和成功审计一次事务提交，失败不发布部分成功结果。默认总预算 120 秒，既有原生预算仍按单次调用执行；共用单图用户限流与流水线容量，一批计一次提交。400/409/429/503/504 语义与单图一致。
+
+可选 Idempotency-Key 按用户与接口隔离。批量摘要包含图片顺序、清理后的显示文件名和每张原字节哈希；同键改变任一项返回 409，在途相同键也返回 409，已提交同内容重试返回原批次及新签名 URL。前端同一有序 File 列表失败/取消后保留键，确认成功后生成新键。新增 batch_id，results 顺序保持请求顺序，file_name 仅用于展示，不决定存储路径。
 
 **成功响应** `200`:
 
@@ -617,6 +634,7 @@ GET /api/detect/records
 | all | string | ❌ | - | 传 `true` 时返回全量数据（忽略分页参数，上限 10000 条） |
 | userId | string (UUID) | ❌ | - | 按用户 ID 精确筛选（auth user_id，非 profile id；仅管理员可用，质检员传此参数无效） |
 | search | string | ❌ | - | 按用户显示名称模糊搜索（仅管理员可用，与 `userId` 互斥，`userId` 优先） |
+| startDate / endDate | string | ❌ | - | 带时区 ISO 8601，起止两端包含；与 CSV 复用相同范围 |
 
 **成功响应** `200`:
 
@@ -657,12 +675,14 @@ GET /api/detect/records
 ```
 
 > **注意**：
-> - `user_id` 为 Supabase Auth 的用户 ID（`auth.users.id`），而非 profiles 表的主键 `id`。
+> - `user_id` 为本地 `users.id`，而非 `user_profiles.id`。
 > - `models` 是关联查询的模型信息子对象，`profiles` 是关联查询的用户资料子对象（含 `role`、`display_name`、`avatar_url`）。
 
 ---
 
 ### 2.4 导出检测记录
+
+> P5 已实现；最大 10000 条，超过返回 400，先完成生成及导出审计再发送 CSV。
 
 ```
 GET /api/detect/records/export
@@ -692,21 +712,21 @@ GET /api/detect/records/export
 CSV 文件内容（管理员）：
 
 ```csv
-检测时间,操作者,邮箱,使用模型,模型版本,缺陷总数,凹坑,边缘裂纹,划痕刮伤,氧化铁皮,缺陷面积占比,推理耗时(ms),原图路径
-2026/4/1 14:30:00,张三,zhangsan@example.com,UNet-ResNet34,1.0.0,3,2,0,1,0,1.83%,52.3,/uploads/results/.../sample_original.png
+检测时间,操作者,邮箱,使用模型,模型版本,缺陷区域数,凹坑,边缘裂纹,划痕刮伤,氧化铁皮,缺陷面积占比,推理耗时(ms),原图存储键
+2026-04-01T14:30:00Z,张三,zhangsan@example.com,UNet-ResNet34,1.0.0,3,2,0,1,0,1.830000%,52.3,results/record-uuid/original.png
 ```
 
 CSV 文件内容（质检员）：
 
 ```csv
-检测时间,操作者,使用模型,模型版本,缺陷总数,凹坑,边缘裂纹,划痕刮伤,氧化铁皮,缺陷面积占比,推理耗时(ms),原图路径
-2026/4/1 14:30:00,张三,UNet-ResNet34,1.0.0,3,2,0,1,0,1.83%,52.3,/uploads/results/.../sample_original.png
+检测时间,操作者,使用模型,模型版本,缺陷区域数,凹坑,边缘裂纹,划痕刮伤,氧化铁皮,缺陷面积占比,推理耗时(ms),原图存储键
+2026-04-01T14:30:00Z,张三,UNet-ResNet34,1.0.0,3,2,0,1,0,1.830000%,52.3,results/record-uuid/original.png
 ```
 
 > **前端须知**：
 > - 响应不是 JSON，而是 CSV 文件流，前端应使用 `Blob` + `URL.createObjectURL` 或 `<a download>` 方式触发下载
 > - 文件以 UTF-8 BOM 开头，确保 Excel 正确识别中文
-> - 导出操作本身会记录一条 `export_records` 类型的操作日志
+> - 导出操作本身会记录一条 `export_records` 日志，details 包含 export_type=detections 和 row_count；文本防公式注入。原图列为稳定逻辑存储键，查询记录详情后获取签名资源，不作为公开下载链接。
 
 **失败响应**:
 
@@ -789,6 +809,52 @@ GET /api/detect/records/:id
 
 ---
 
+### 2.6 提交异步批量任务
+
+`POST /api/detect/tasks`，Bearer 认证，`multipart/form-data` 重复字段 `images`，1～20 张；图片格式、10 MiB/张、像素限制沿用同步检测。支持可选 `Idempotency-Key`（1～128 位 ASCII 字母、数字、点、下划线、冒号、短横线）。
+
+全部输入验证并持久化后返回 **202 Accepted**，`Location: /api/detect/tasks/{task_id}`；统一响应 `data` 与下节任务结构一致。202 表示受理，实际任务可能仍在排队。提交固定当时模型、权重摘要、预处理、运行时与实际设备；之后切换默认模型或重启不改变该任务快照。
+
+幂等键按用户与该异步接口隔离；相同键、相同顺序的文件名和文件摘要返回原任务（包括已结束任务），不同内容返回 409。同键并发提交可能先返回 409，客户端保留原键重试。同步批量的键与任务键独立。限流返回 429；待处理任务达到默认容量 8、上传暂存并发达到 2 或模型暂不可用返回 503；输入错误返回 400/413。
+
+### 2.7 查询异步任务与恢复结果
+
+`GET /api/detect/tasks/{UUID}`，Bearer 认证。普通用户仅查自己的任务，管理员可查全部；不存在或越权返回 404，无认证返回 401。
+
+```json
+{
+  "success": true,
+  "data": {
+    "task_id": "aa024891-c23a-42c5-b852-c372af684dc4",
+    "status": "running",
+    "image_count": 20,
+    "completed_images": 7,
+    "progress_percent": 35.0,
+    "attempts": 1,
+    "max_attempts": 3,
+    "model": { "id": "model-uuid", "name": "Unet++", "version": "v2" },
+    "requested_device": "auto",
+    "actual_device": "cpu",
+    "fallback_reason": "CUDA 不可用",
+    "error_code": null,
+    "created_at": "2026-11-04T10:00:00Z",
+    "updated_at": "2026-11-04T10:00:03Z",
+    "next_attempt_at": "2026-11-04T10:00:00Z",
+    "expires_at": "2026-11-04T11:00:00Z",
+    "progress_source": "redis",
+    "result": null
+  }
+}
+```
+
+状态为 `queued`、`running`、`retry_wait`、`succeeded`、`failed`。仅 `succeeded.result` 为第 2.2 节的整批结果结构（`batch_id/model/total/results`）；其余为 null，不发布部分记录。每次查询成功任务重新生成短期签名图片 URL，过期后重新查询。`completed_images` 是当前尝试的进度，重试时可能回到 0；失败任务可能保留失败前完成数，不表示这些记录已发布。
+
+MySQL 保存最终状态与恢复依据；Redis 进度默认 TTL 5 分钟，丢失、过期或连接故障时回查 MySQL，`progress_source` 为 `mysql`。这只表示进度查询可回退，认证和检测限流仍沿用其既有限流故障策略。
+
+默认最多尝试 3 次（含首次），退避基数 1 秒，单次预算 5 分钟，总任务期限 1 小时；超时会请求原生推理终止，资源等待实际退出后释放。常见安全错误码：`INPUT_MISSING/INPUT_CHANGED`、`USER_DISABLED`、`ATTEMPT_TIMEOUT/NATIVE_TIMEOUT`、`TASK_EXPIRED`、`INFERENCE_UNAVAILABLE`、`WORKER_RESTARTED`；具体失败不暴露路径或堆栈。冻结 CUDA 不可用时重试后失败，不改用 CPU；提交时 auto 已回退到 CPU 的任务恢复后继续 CPU。
+
+前端串行轮询、终态停止，连续网络查询失败 3 次后暂停并保留任务号；按账号保留最近任务号，也可从操作日志复制。暂停、离开页面和浏览器中断均不取消服务端任务；本阶段无任务取消或任务列表接口。
+
 ## 三、模型管理接口 (`/api/models`)
 
 > 所有接口需要认证。上传/激活/删除操作仅管理员可用。
@@ -813,7 +879,7 @@ GET /api/models
       "version": "1.0.0",
       "arch_version": "v2",
       "file_name": "UnetPlusPlus_resnet34_v2_cleaned.onnx",
-      "file_path": "/absolute/path/to/model.onnx",
+      "file_path": "models/model-uuid.onnx",
       "num_classes": 4,
       "description": "基于 ResNet34 编码器的 UNet 语义分割模型",
       "status": "active",
@@ -823,6 +889,7 @@ GET /api/models
       "precision": 0.864,
       "recall": 0.823,
       "fps": 32.5,
+      "metric_source": "管理员提供的验证集评估记录",
       "file_size": 89.2,
       "created_at": "2026-02-20T10:00:00Z",
       "updated_at": "2026-02-22T14:00:00Z"
@@ -834,6 +901,8 @@ GET /api/models
 > **前端提示**：`status` 为 `"active"` 的模型是当前正在使用的推理模型，同一时刻只有一个 active 模型。
 >
 > **`arch_version` 字段说明**：后端只支持 `"v2"`，固定 `num_classes=4`，输出 `[B,4,H,W]` logits，无背景通道，使用 sigmoid 多标签后处理。模型元信息声明和实际图结构必须一致。
+>
+> `file_path` 是逻辑存储键，不能作为公开下载 URL。另返回 `file_sha256`、`file_size_bytes`、`metric_source` 与 `inference_config`。未评估的质量指标为 `null`，文件大小按实际字节数 / 1024² 返回 MiB。
 
 ---
 
@@ -849,7 +918,7 @@ POST /api/models
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| model | File (.onnx) | ✅ | ONNX 模型文件（最大 500MB） |
+| model | File (.onnx) | ✅ | ONNX 模型文件（最大 500 MiB） |
 | name | string | ✅ | 模型名称 |
 | version | string | ❌ | 版本号（默认 `"1.0.0"`） |
 | arch_version | string | ❌ | 仅允许 `"v2"`，省略时仍按 V2 校验，其他值拒绝；`num_classes` 固定为 4 |
@@ -870,11 +939,12 @@ POST /api/models
     "status": "inactive",
     "description": "升级版模型",
     "uploaded_by": "admin-uuid",
-    "miou": 0.812,
-    "dice": 0.835,
-    "precision": 0.882,
-    "recall": 0.846,
-    "fps": 28.6,
+    "miou": null,
+    "dice": null,
+    "precision": null,
+    "recall": null,
+    "fps": null,
+    "metric_source": null,
     "file_size": 102.5,
     "created_at": "2026-02-23T10:00:00Z",
     "updated_at": "2026-02-23T10:00:00Z"
@@ -884,6 +954,10 @@ POST /api/models
 ```
 
 > **注意**：新上传的模型默认为 `inactive` 状态，需单独调用激活接口。
+>
+> 上传会校验实际 protobuf 图，拒绝外部权重引用、自定义算子域、训练图/本地函数及不兼容的 float32/NCHW 输入输出；在原生 256×1600 尺寸进行 CPU 预热并检查输出有限。最大 500 MiB，权重必须内嵌。已有两个模型按 P0 SHA-256 识别；其他模型需在 ONNX `metadata_props` 中声明 `ssdd.contract=ssdd-v2-2026-11-03`，并符合 RGB [0,255]、内置归一化、四通道 logits 契约。输出端 Sigmoid/Softmax 会被拒绝。声明与结构校验用于工程兼容，模型质量仍需独立评估。
+>
+> 上传不会自动生成 mIoU、Dice 或 FPS；这些字段初始均为 null。
 
 ---
 
@@ -917,15 +991,19 @@ PUT /api/models/:id/activate
 ```
 
 > **行为说明**：
-> - 数据库触发器会自动将其他模型设为 `inactive`
-> - 该模型同时被加载到内存中的推理引擎，立即可用于检测
+> - 唯一 `model_runtime_state` 指针派生 active/inactive，不使用触发器维护多个状态字段
+> - 校验文件哈希、加载及预热候选后，短事务提交活动指针和审计，再发布内存句柄；失败保留原句柄
+> - 已开始的请求保留原 Session/元信息快照，使用结束后释放；P4 检测接口将复用该租约机制
+> - 激活可能需要加载百兆文件，前端超时为 300 秒；重复管理任务或候选数量达到上限返回 503
 
 **失败响应**:
 
 | 状态码 | 原因 |
 |--------|------|
 | 404 | 模型不存在 |
-| 400 | 模型文件不存在于磁盘 |
+| 400 | 模型文件缺失/哈希变化/契约无效 |
+| 409 | 活动状态被并发修改，需刷新重试 |
+| 503 | 管理资源忙或指定设备初始化/预热失败 |
 
 ---
 
@@ -955,7 +1033,8 @@ PUT /api/models/:id
 | precision | number | ❌ | 精确率 Precision（0.0~1.0，传 `null` 清空） |
 | recall | number | ❌ | 召回率 Recall（0.0~1.0，传 `null` 清空） |
 | fps | number | ❌ | 推理帧率（帧/秒，传 `null` 清空） |
-| file_size | number | ❌ | 模型文件大小（MB，传 `null` 清空） |
+| metric_source | string \| null | ❌ | 指标来源说明，填写非空质量指标或 FPS 时必须提供 |
+| file_size | number \| null | ❌ | 兼容旧客户端接收，但不覆盖服务端测量的真实文件大小；新前端只读 |
 
 > **注意**：至少提供一个字段，未传的字段保持不变。
 
@@ -1021,7 +1100,33 @@ DELETE /api/models/:id
 | 404 | 模型不存在 |
 | 400 | 不能删除当前 active 的模型 |
 
-> **注意**：删除操作会同时清除数据库记录和磁盘上的 `.onnx` 文件。
+> 删除采用软删除，查询列表隐藏该记录。历史检测引用及快照保留；有历史引用的权重保留，无历史引用的权重在没有活动/退休 Session 租约后清理。活动模型禁止删除。
+
+### 3.6 模型详情与推理状态
+
+`GET /api/models/:id` 返回同列表结构的模型详情；`GET /api/models/runtime` 返回以下状态，均需要认证：
+
+```json
+{
+  "success": true,
+  "data": {
+    "ready": true,
+    "active_model_id": "model-uuid",
+    "state_version": 1,
+    "requested_device": "auto",
+    "actual_device": "cpu",
+    "fallback_reason": "CUDA_INITIALIZATION_FAILED",
+    "runtime_version": "1.31.1",
+    "error_code": null,
+    "retired_sessions": 0,
+    "active_leases": 0
+  }
+}
+```
+
+设备配置由服务器控制，普通请求不指定 GPU 编号。CPU 构建支持 cpu；GPU 构建支持 cpu/cuda/auto。强制 cuda 失败时不回退，auto 仅在创建/预热阶段回退 CPU 并记录原因。推理运行错误不会悄然重跑 CPU。
+
+`status=active` 表示持久活动指针；`ready=true` 还要求本进程恢复了对应版本的 Session。启动恢复失败保留数据库指针，`/actuator/health/inference` 为 503，`/health` 与账号 readiness 仍独立。当前部署按单实例协调租约；发现其他实例改写指针后，旧实例拒绝新推理租约并等待恢复/重新激活。
 
 ---
 
@@ -1072,7 +1177,7 @@ GET /api/admin/users
 }
 ```
 
-> **注意**：`email` 字段是从 Supabase Auth 系统单独查询并合并的，不在 profiles 表中。
+> **注意**：`email` 来自本地 `users`；用户管理路径参数 `id` 是 `user_profiles.id`，与 `user_id` 不同。
 
 ---
 
@@ -1148,7 +1253,7 @@ PUT /api/admin/users/:id/role
     "display_name": "张三",
     ...
   },
-  "message": "用户 \"张三\" 的角色已从 inspector 变更为 admin"
+  "message": "角色修改成功"
 }
 ```
 
@@ -1159,7 +1264,7 @@ PUT /api/admin/users/:id/role
 | 400 | 无效的角色值 / 不能修改自己的角色 |
 | 404 | 用户不存在 |
 
-> **业务规则**：管理员不能修改自己的角色，防止系统失去管理员。
+> **业务规则**：管理员不能修改自己的角色，不能移除最后一个活动管理员。变更使用数据库锁串行化，并在锁内重新检查操作者权限；并发互相降级时，后获得锁且已被降级的一方返回 403。
 
 ---
 
@@ -1193,12 +1298,14 @@ GET /api/admin/stats
 | 字段 | 说明 |
 |------|------|
 | `total_users` | 系统总用户数 |
-| `total_detections` | 历史检测总次数 |
-| `total_models` | 已上传模型总数 |
+| `total_detections` | 已成功提交的图片记录数，批量按每张计数 |
+| `total_models` | 未软删除的模型总数 |
 | `active_models` | 当前激活的模型数量（应为 0 或 1） |
 | `recent_detection_count` | 最近统计的检测样本数（最多 100） |
 | `avg_inference_time_ms` | 最近检测的平均推理耗时（ms） |
-| `avg_defect_count` | 最近检测的平均缺陷数量 |
+| `avg_defect_count` | 最近最多 100 条成功记录的平均区域数；空集为 0 |
+
+统计聚合使用同一数据库快照。Redis 仅缓存管理员全局聚合 DTO，默认 30 秒；成功数据库变更提交后失效，回滚不失效。回填通过 generation 标记比较，防止旧查询覆盖提交后的失效结果。Redis 异常回源 MySQL，不影响已提交的检测；失效故障时允许 TTL 内陈旧。首页本地缓存按账号/角色隔离，30 秒 TTL，检测/模型操作后失效。
 
 ---
 
@@ -1275,6 +1382,7 @@ GET /api/logs
 > **说明**：
 > - 每条日志附带 `user` 子对象，包含操作者的显示名称和邮箱，方便前端直接展示。
 > - 管理员查询时 `user.email` 字段有值；质检员查询时 `user.email` 为空字符串。
+> - 系统/历史日志的 user_id、ip_address、user_agent 可为空。新增 request_id 和 target_id；新 HTTP 审计使用直接连接 IP、有界 User-Agent，既有空字段不回填。日期均为带时区 ISO 8601，起止两端包含；列表和导出复用同一权限/筛选条件，前端日期选择的结束日期展开至当日末尾。
 
 ---
 
@@ -1303,15 +1411,15 @@ GET /api/logs/export
 CSV 文件内容（管理员）：
 
 ```csv
-操作时间,操作者,邮箱,操作类型,操作状态,IP 地址,客户端,操作详情
-2026/4/1 14:30:00,张三,zhangsan@example.com,单张检测,成功,127.0.0.1,Mozilla/5.0 ...,"{""model_id"":""uuid"",""defect_count"":3}"
+操作时间,操作者,邮箱,操作类型,操作状态,IP 地址,客户端,操作详情,请求 ID
+2026-04-01T14:30:00Z,张三,zhangsan@example.com,单张检测,成功,127.0.0.1,Mozilla/5.0 ...,"{""model_id"":""uuid"",""defect_count"":3}",request-uuid
 ```
 
 CSV 文件内容（质检员）：
 
 ```csv
-操作时间,操作者,操作类型,操作状态,IP 地址,客户端,操作详情
-2026/4/1 14:30:00,张三,单张检测,成功,127.0.0.1,Mozilla/5.0 ...,"{""model_id"":""uuid"",""defect_count"":3}"
+操作时间,操作者,操作类型,操作状态,IP 地址,客户端,操作详情,请求 ID
+2026-04-01T14:30:00Z,张三,单张检测,成功,127.0.0.1,Mozilla/5.0 ...,"{""model_id"":""uuid"",""defect_count"":3}",request-uuid
 ```
 
 > **前端须知**：
@@ -1377,18 +1485,26 @@ GET /health
 
 | 值 | 说明 | details 字段示例 |
 |----|------|------------------|
-| `login` | 用户登录 | `{ "email": "..." }` |
+| `login` | 用户登录 | `{}` |
 | `logout` | 用户登出 | `{}` |
-| `register` | 用户注册 | `{ "email": "..." }` |
-| `detect` | 单张图片检测 | `{ "model_id": "...", "model_name": "...", "defect_count": 3, "inference_time_ms": 52 }` |
-| `batch_detect` | 批量图片检测 | `{ "model_id": "...", "model_name": "...", "image_count": 5 }` |
-| `model_switch` | 切换激活模型 | `{ "model_id": "...", "model_name": "...", "model_version": "..." }` |
-| `model_upload` | 上传新模型 | `{ "model_id": "...", "model_name": "...", "file_name": "..." }` |
-| `model_delete` | 删除模型 | `{ "model_id": "...", "model_name": "...", "file_name": "..." }` |
-| `export_records` | 导出检测记录 | `{ ... }` |
+| `register` | 用户注册 | `{ "role": "inspector" }` |
+| `detect` | 单张图片检测 | `{ "record_id": "...", "model_id": "...", "defect_count": 3, "actual_device": "cpu" }` |
+| `batch_detect` | 批量图片检测 | `{ "batch_id": "...", "model_id": "...", "image_count": 5, "actual_device": "cuda" }` |
+| `task_submit` | 提交异步任务 | `{ "task_id": "...", "model_id": "...", "image_count": 20, "actual_device": "cpu" }` |
+| `task_retry` | 异步任务等待重试 | `{ "task_id": "...", "attempt": 1, "error_code": "INFERENCE_UNAVAILABLE" }` |
+| `task_failed` | 异步任务失败 | `{ "task_id": "...", "attempt": 3, "error_code": "INFERENCE_UNAVAILABLE" }` |
+| `model_switch` | 兼容历史筛选值；当前改用 model_activate | `{ "model_id": "..." }` |
+| `model_activate` | 激活模型 | `{ "model_id": "...", "actual_device": "cpu" }` |
+| `model_update` | 修改模型 | `{ "model_id": "..." }` |
+| `model_upload` | 上传新模型 | `{ "model_id": "...", "sha256": "...", "bytes": 123 }` |
+| `model_delete` | 删除模型 | `{ "model_id": "...", "historical_weights_retained": true }` |
+| `export_records` | 导出检测或日志 | `{ "export_type": "logs", "row_count": 100 }` |
+| `refresh_reuse` | 刷新令牌重放 | `{ "session_id": "..." }` |
 | `password_change` | 修改密码 | `{}` |
-| `profile_update` | 修改个人信息 | `{ "display_name": "...", "avatar_url": "..." }` |
-| `user_role_change` | 修改用户角色 | `{ "target_user_id": "...", "target_display_name": "...", "old_role": "inspector", "new_role": "admin" }` |
+| `profile_update` | 修改个人信息 | `{}` 或 `{ "avatar_updated": true }` |
+| `user_role_change` | 修改用户角色 | `{ "target_user_id": "...", "old_role": "inspector", "new_role": "admin" }` |
+
+失败日志 details 仅保存安全错误状态；未认证失败的 user_id 可为空。邮箱按权限关联查询，不在普通操作 details 中重复保存。
 
 ---
 

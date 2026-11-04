@@ -33,11 +33,13 @@ function renderDetails(d: Record<string, unknown>): string {
   const targetName = str(d.target_display_name)
   const oldRole = str(d.old_role)
   const newRole = str(d.new_role)
+  const taskId = str(d.task_id)
 
   if (modelName) parts.push(`模型: ${modelName}`)
   if (defectCount !== undefined) parts.push(`缺陷: ${defectCount}`)
   if (inferenceTime !== undefined) parts.push(`耗时: ${inferenceTime}ms`)
   if (imageCount !== undefined) parts.push(`图片: ${imageCount}张`)
+  if (taskId) parts.push(`任务号: ${taskId}`)
   if (fileName) parts.push(`文件: ${fileName}`)
   if (email) parts.push(`邮箱: ${email}`)
   if (reason) parts.push(`原因: ${reason}`)

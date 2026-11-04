@@ -1,5 +1,26 @@
 # Copy to application-local.yml in the backend working directory. Never commit credentials.
 ssdd:
+  inference:
+    # Use -Pgpu when building a CUDA-capable JAR, then provide matching DLLs in the process PATH.
+    device: ${SSDD_INFERENCE_DEVICE:cpu}
+    device-id: ${SSDD_GPU_DEVICE_ID:0}
   database:
     username: ${SSDD_DB_USERNAME:ssdd_app}
     password: ${SSDD_DB_PASSWORD:}
+  auth:
+    # Required: Base64 of at least 32 cryptographically random bytes. Never commit the real key.
+    signing-key: ${SSDD_JWT_SIGNING_KEY:}
+  bootstrap-admin:
+    # First startup only; existing active admin is preserved, never reset or promoted.
+    enabled: ${SSDD_BOOTSTRAP_ADMIN_ENABLED:false}
+    email: ${SSDD_BOOTSTRAP_ADMIN_EMAIL:}
+    display-name: ${SSDD_BOOTSTRAP_ADMIN_NAME:}
+    password: ${SSDD_BOOTSTRAP_ADMIN_PASSWORD:}
+spring:
+  data:
+    redis:
+      host: ${SSDD_REDIS_HOST:127.0.0.1}
+      port: ${SSDD_REDIS_PORT:6380}
+      database: ${SSDD_REDIS_DATABASE:0}
+      username: ${SSDD_REDIS_USERNAME:}
+      password: ${SSDD_REDIS_PASSWORD:}

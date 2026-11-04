@@ -2,13 +2,25 @@ import api from './index'
 import type { ApiResponse, PaginatedData } from '@/types/api'
 import type { DetectResult, BatchDetectData, DetectRecord } from '@/types/detect'
 
+// Failed/cancelled requests keep their key; a confirmed success starts a new attempt next time.
+const singleRequestKeys = new WeakMap<File, string>()
+const batchRequestKeys = new WeakMap<File, { files: File[]; key: string }>()
+
 /** 单张图片检测 */
 export function detectImage(file: File, signal?: AbortSignal) {
+  let requestKey = singleRequestKeys.get(file)
+  if (!requestKey) {
+    requestKey = crypto.randomUUID()
+    singleRequestKeys.set(file, requestKey)
+  }
   const formData = new FormData()
   formData.append('image', file)
   return api.post<ApiResponse<DetectResult>>('/api/detect', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': 'multipart/form-data', 'Idempotency-Key': requestKey },
     signal,
+  }).then((response) => {
+    if (response.data.success) singleRequestKeys.delete(file)
+    return response
   })
 }
 
@@ -21,10 +33,15 @@ export function detectBatch(
   files: File[],
   options?: { signal?: AbortSignal; onProgress?: (percent: number) => void },
 ) {
+  let attempt = files[0] ? batchRequestKeys.get(files[0]) : undefined
+  if (!attempt || attempt.files.length !== files.length || !attempt.files.every((file, i) => file === files[i])) {
+    attempt = { files: [...files], key: crypto.randomUUID() }
+    if (files[0]) batchRequestKeys.set(files[0], attempt)
+  }
   const formData = new FormData()
   files.forEach((file) => formData.append('images', file))
   return api.post<ApiResponse<BatchDetectData>>('/api/detect/batch', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': 'multipart/form-data', 'Idempotency-Key': attempt.key },
     timeout: 120_000,
     signal: options?.signal,
     onUploadProgress: (e) => {
@@ -32,6 +49,11 @@ export function detectBatch(
         options.onProgress(Math.round((e.loaded / e.total) * 100))
       }
     },
+  }).then((response) => {
+    if (response.data.success && files[0] && batchRequestKeys.get(files[0]) === attempt) {
+      batchRequestKeys.delete(files[0])
+    }
+    return response
   })
 }
 
@@ -42,6 +64,8 @@ export function getRecords(params?: {
   search?: string
   userId?: string
   all?: boolean
+  startDate?: string
+  endDate?: string
 }) {
   return api.get<ApiResponse<PaginatedData<DetectRecord>>>('/api/detect/records', { params })
 }

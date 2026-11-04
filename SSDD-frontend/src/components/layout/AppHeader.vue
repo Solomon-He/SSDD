@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { getImageUrl } from '@/utils/image'
 import { Fold, Expand, User, SwitchButton, Setting } from '@element-plus/icons-vue'
 
 defineProps<{
@@ -36,7 +37,7 @@ async function handleLogout() {
     <div class="app-header__right">
       <el-dropdown trigger="click">
         <span class="app-header__user">
-          <el-avatar :size="32" :src="authStore.avatarUrl || undefined">
+          <el-avatar :size="32" :src="authStore.avatarUrl ? getImageUrl(authStore.avatarUrl) : undefined">
             <el-icon><User /></el-icon>
           </el-avatar>
           <span class="app-header__username">{{ authStore.displayName || '用户' }}</span>

@@ -1,0 +1,13 @@
+{
+  "policy_id": "p25-fp32-before-native-size-comparison-v1",
+  "precision": "FP32, use_tf32=0, no TTA",
+  "per_element_logit_atol": 0.001,
+  "per_element_logit_rtol": 0.001,
+  "all_logits_must_be_finite": true,
+  "max_raw_mask_disagreement_fraction": 0.0001,
+  "max_cpu_probability_distance_from_threshold_for_flips": 0.001,
+  "min_filtered_mask_iou_per_class": 0.999,
+  "empty_empty_iou": 1.0,
+  "filtered_component_counts_must_match": true,
+  "rules": "Every image and class must pass. Relative error is diagnostic near zero; acceptance uses abs(gpu-cpu) <= atol + rtol*abs(cpu). Do not revise thresholds after observing results."
+}

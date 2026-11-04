@@ -1,13 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Model, UploadModelParams, UpdateModelParams } from '@/types/model'
-import { getModels, uploadModel, updateModel, activateModel, deleteModel } from '@/api/models'
+import type { Model, ModelRuntime, UploadModelParams, UpdateModelParams } from '@/types/model'
+import { getModels, getModelRuntime, uploadModel, updateModel, activateModel, deleteModel } from '@/api/models'
 import { ElMessage } from 'element-plus'
+import { invalidateHomeData } from '@/composables/useHomeData'
 
 export const useModelsStore = defineStore('models', () => {
   // ---- State ----
   const models = ref<Model[]>([])
   const loading = ref(false)
+  const runtime = ref<ModelRuntime | null>(null)
+
+  async function fetchRuntime() {
+    const { data: res } = await getModelRuntime()
+    runtime.value = res.success && res.data ? res.data : null
+  }
 
   // ---- Getters ----
   const activeModel = computed(() => models.value.find((m) => m.status === 'active'))
@@ -27,7 +34,7 @@ export const useModelsStore = defineStore('models', () => {
     if (!force && models.value.length) return
     loading.value = true
     try {
-      const { data: res } = await getModels()
+      const [{ data: res }] = await Promise.all([getModels(), fetchRuntime()])
       if (res.success && res.data) {
         models.value = res.data
       }
@@ -43,6 +50,7 @@ export const useModelsStore = defineStore('models', () => {
       const { data: res } = await uploadModel(params)
       if (res.success && res.data) {
         models.value.push(res.data)
+        invalidateHomeData()
         ElMessage.success(res.message || '模型上传成功')
         return true
       }
@@ -65,6 +73,8 @@ export const useModelsStore = defineStore('models', () => {
         models.value.forEach((m) => (m.status = 'inactive'))
         const target = models.value.find((m) => m.id === id)
         if (target) Object.assign(target, res.data)
+        await fetchRuntime().catch(() => { runtime.value = null })
+        invalidateHomeData()
         ElMessage.success(res.message || '模型已激活')
         return true
       }
@@ -85,6 +95,7 @@ export const useModelsStore = defineStore('models', () => {
       if (res.success && res.data) {
         const target = models.value.find((m) => m.id === id)
         if (target) Object.assign(target, res.data)
+        invalidateHomeData()
         ElMessage.success(res.message || '模型信息已更新')
         return true
       }
@@ -104,6 +115,7 @@ export const useModelsStore = defineStore('models', () => {
       const { data: res } = await deleteModel(id)
       if (res.success) {
         models.value = models.value.filter((m) => m.id !== id)
+        invalidateHomeData()
         ElMessage.success(res.message || '模型已删除')
         return true
       }
@@ -119,6 +131,7 @@ export const useModelsStore = defineStore('models', () => {
   return {
     models,
     loading,
+    runtime,
     activeModel,
     setModels,
     fetchModels,

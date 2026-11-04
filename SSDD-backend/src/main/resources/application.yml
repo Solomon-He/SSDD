@@ -3,6 +3,15 @@ spring:
     name: SSDD-backend
   profiles:
     default: dev
+  data:
+    redis:
+      host: ${SSDD_REDIS_HOST:127.0.0.1}
+      port: ${SSDD_REDIS_PORT:6379}
+      database: ${SSDD_REDIS_DATABASE:0}
+      username: ${SSDD_REDIS_USERNAME:}
+      password: ${SSDD_REDIS_PASSWORD:}
+      connect-timeout: 1s
+      timeout: 1s
   datasource:
     url: ${ssdd.database.url}
     username: ${ssdd.database.username}
@@ -34,6 +43,8 @@ spring:
     log-request-details: false
 
 server:
+  # Direct deployment: do not trust client-supplied X-Forwarded-For/Forwarded.
+  forward-headers-strategy: none
   port: ${SSDD_PORT:3000}
   error:
     include-message: never
@@ -46,6 +57,58 @@ server:
 
 ssdd:
   version: '@project.version@'
+  tasks:
+    worker-enabled: ${SSDD_TASK_WORKER_ENABLED:true}
+    capacity: 8
+    max-attempts: 3
+    poll-interval: 500ms
+    retry-delay: 1s
+    attempt-timeout: 5m
+    max-age: 1h
+    progress-ttl: 5m
+  batch:
+    max-images: 20
+    processing-timeout: 120s
+  stats-cache:
+    ttl: 30s
+  detection:
+    max-file-bytes: ${MAX_FILE_SIZE:10485760}
+    max-pixels: 8000000
+    max-dimension: 8192
+    rate-limit-enabled: ${SSDD_DETECTION_RATE_LIMIT_ENABLED:${SSDD_RATE_LIMIT_ENABLED:true}}
+    requests-per-window: 10
+    rate-window: 1m
+    result-url-ttl: 15m
+    processing-timeout: 30s
+  inference:
+    device: ${SSDD_INFERENCE_DEVICE:cpu}
+    device-id: ${SSDD_GPU_DEVICE_ID:0}
+    max-concurrency: 1
+    max-loaded-sessions: 2
+    gpu-memory-limit-bytes: 6442450944
+    run-timeout: 30s
+  auth:
+    signing-key: ${SSDD_JWT_SIGNING_KEY:}
+    issuer: ssdd
+    audience: ssdd-web
+    access-ttl: 15m
+    refresh-ttl: 7d
+    bcrypt-strength: 12
+  bootstrap-admin:
+    enabled: ${SSDD_BOOTSTRAP_ADMIN_ENABLED:false}
+    email: ${SSDD_BOOTSTRAP_ADMIN_EMAIL:}
+    display-name: ${SSDD_BOOTSTRAP_ADMIN_NAME:}
+    password: ${SSDD_BOOTSTRAP_ADMIN_PASSWORD:}
+  rate-limit:
+    enabled: ${SSDD_RATE_LIMIT_ENABLED:true}
+    namespace: ${SSDD_REDIS_NAMESPACE:ssdd:auth}
+    window: 15m
+    login-ip-limit: 60
+    login-account-limit: 20
+    register-ip-limit: 10
+    refresh-ip-limit: 120
+    max-failures: 5
+    cooldown: 15m
   database:
     url: ${SSDD_DB_URL:jdbc:mysql://127.0.0.1:3306/ssdd?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
     username: ${SSDD_DB_USERNAME:}
@@ -76,7 +139,9 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,redis
+        inference:
+          include: modelInference
   info:
     env:
       enabled: false

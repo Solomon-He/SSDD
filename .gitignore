@@ -1,5 +1,11 @@
 .firecrawl/
 
+# Local planning, acceptance tooling and runtime data (at every directory level)
+docs/
+scripts/
+tools/
+var/
+
 # Dependencies, generated outputs and local tools
 node_modules/
 target/
@@ -8,6 +14,8 @@ dist-ssr/
 coverage/
 *.tsbuildinfo
 .eslintcache
+__pycache__/
+*.py[cod]
 
 # Private machine configuration and runtime data
 application-local.yml
@@ -15,7 +23,6 @@ application-local.yml
 .env.*
 !.env.example
 !SSDD-frontend/.env.development
-var/
 *.log
 *.hprof
 *.jfr

@@ -1,10 +1,14 @@
 import api from './index'
 import type { ApiResponse } from '@/types/api'
-import type { Model, UploadModelParams, UpdateModelParams } from '@/types/model'
+import type { Model, ModelRuntime, UploadModelParams, UpdateModelParams } from '@/types/model'
 
 /** 获取模型列表 */
 export function getModels() {
   return api.get<ApiResponse<Model[]>>('/api/models')
+}
+
+export function getModelRuntime() {
+  return api.get<ApiResponse<ModelRuntime>>('/api/models/runtime')
 }
 
 /** 上传新模型 */
@@ -22,7 +26,7 @@ export function uploadModel(params: UploadModelParams) {
 
 /** 激活模型 */
 export function activateModel(id: string) {
-  return api.put<ApiResponse<Model>>(`/api/models/${encodeURIComponent(id)}/activate`)
+  return api.put<ApiResponse<Model>>(`/api/models/${encodeURIComponent(id)}/activate`, undefined, { timeout: 300_000 })
 }
 
 /** 修改模型信息 */

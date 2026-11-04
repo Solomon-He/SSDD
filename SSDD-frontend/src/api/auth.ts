@@ -1,5 +1,7 @@
 import api from './index'
 import axios from 'axios'
+import type { AxiosResponse } from 'axios'
+import { ElMessage } from 'element-plus'
 import type { ApiResponse } from '@/types/api'
 import type {
   LoginPayload,
@@ -18,19 +20,42 @@ const publicApi = axios.create({
   timeout: 30000,
 })
 
+// 登录、注册的 401 是凭据错误，不应触发当前会话的自动续期。
+async function publicPost<T>(path: string, data: unknown) {
+  try {
+    return await publicApi.post<ApiResponse<T>>(path, data)
+  } catch (error) {
+    ElMessage.error(
+      axios.isAxiosError(error)
+        ? error.response?.data?.error || '请求失败，请稍后重试'
+        : '网络异常，请检查网络连接',
+    )
+    throw error
+  }
+}
+
+const refreshing = new Map<string, Promise<AxiosResponse<ApiResponse<LoginData>>>>()
+
 /** 用户登录 */
 export function login(data: LoginPayload) {
-  return api.post<ApiResponse<LoginData>>('/api/auth/login', data)
+  return publicPost<LoginData>('/api/auth/login', data)
 }
 
 /** 刷新 Token */
 export function refreshToken(refresh_token: string) {
-  return publicApi.post<ApiResponse<LoginData>>('/api/auth/refresh', { refresh_token })
+  // 路由守卫与响应拦截器可能同时续期；同一令牌只能消费一次。
+  const pending = refreshing.get(refresh_token)
+  if (pending) return pending
+  const request = publicApi
+    .post<ApiResponse<LoginData>>('/api/auth/refresh', { refresh_token })
+    .finally(() => refreshing.delete(refresh_token))
+  refreshing.set(refresh_token, request)
+  return request
 }
 
 /** 用户注册 */
 export function register(data: RegisterPayload) {
-  return api.post<ApiResponse<RegisterData>>('/api/auth/register', data)
+  return publicPost<RegisterData>('/api/auth/register', data)
 }
 
 /** 用户登出 */

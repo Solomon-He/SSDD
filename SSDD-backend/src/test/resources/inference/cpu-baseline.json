@@ -1,0 +1,231 @@
+{
+  "status" : "passed",
+  "phase" : "cpu-artifact-baseline",
+  "generated_at" : "2026-11-03T16:51:33.479131Z",
+  "java" : "17.0.21+9",
+  "os" : "Windows 11 amd64",
+  "runtime" : "1.31.1",
+  "artifact" : "onnxruntime",
+  "providers_available" : "[CPU, AZURE]",
+  "precision" : "FP32; TF32 disabled; no TTA",
+  "warmups_per_session" : 2,
+  "measured_repeats_per_image" : 3,
+  "intra_op_threads" : 2,
+  "inter_op_threads" : 1,
+  "max_concurrency" : 1,
+  "gpu_memory_limit_bytes" : 6442450944,
+  "tolerance_policy_sha256" : "b19be505bc3ddf3562a4d86543e8bfc3d489e0fedf8b5de10bd48182882618bb",
+  "models" : [ {
+    "file" : "UnetPlusPlus_resnet34_v2_cleaned.onnx",
+    "sha256" : "1a249fce31ccd51ae9af7b50623ba09cfcc83e078c5cd9671d325b8776680f16",
+    "samples" : [ {
+      "end_to_end_ms" : 491.6751,
+      "image" : "0025bde0c.jpg",
+      "components" : [ 0, 0, 5, 1 ],
+      "image_sha256" : "6af208ba023a824b457992e828f8e23fb3e3bec2790cd3be13afd5210710bca0",
+      "logits_sha256" : "4f389aa044078461913522d6cd0938dda0b4c6b69475e2420a664e825fc88e14",
+      "session_run_ms" : 423.0919,
+      "pixels" : [ 0, 0, 31519, 15569 ]
+    }, {
+      "end_to_end_ms" : 719.3013,
+      "image" : "0088260da.jpg",
+      "components" : [ 0, 0, 6, 0 ],
+      "image_sha256" : "3f4d715b24ca6a6a6d3fbb448137086ffbce8314cfaa3e665506d89c6878c479",
+      "logits_sha256" : "23a93e96184320dc1c447b6f5da2eff4f86c002683d277fc4c342573a34d1f5f",
+      "session_run_ms" : 679.5797,
+      "pixels" : [ 0, 0, 68913, 0 ]
+    }, {
+      "end_to_end_ms" : 670.8492,
+      "image" : "00ac8372f.jpg",
+      "components" : [ 1, 2, 0, 0 ],
+      "image_sha256" : "fd7f57afdb9b5f66d9906e6eb64c945fb41cab80c072ad5b46d12c46471ea225",
+      "logits_sha256" : "441934489cbb21029c212bb64e9951433f05ac88a816a9f03bffc76a1ec73ee8",
+      "session_run_ms" : 639.5921,
+      "pixels" : [ 1450, 8672, 0, 0 ]
+    }, {
+      "end_to_end_ms" : 622.6843,
+      "image" : "00af2671f.jpg",
+      "components" : [ 0, 0, 4, 0 ],
+      "image_sha256" : "39011422f78fba6367f56c4cae79075fd188d5758a5f68f1658dd114457f03a6",
+      "logits_sha256" : "1c2b867f1be8fb2d48112345fe041a72462baaebdd8a6bbd98a69aac5d052391",
+      "session_run_ms" : 594.9972,
+      "pixels" : [ 0, 0, 44622, 0 ]
+    }, {
+      "end_to_end_ms" : 653.048,
+      "image" : "08de8df60.jpg",
+      "components" : [ 6, 0, 3, 0 ],
+      "image_sha256" : "1a0867457dd68ae68aa20b24d5563b096093058a1dcf0feaeca8484249111044",
+      "logits_sha256" : "803aed04c98a2bb327e4cc8a34f70176670bf378e96e60fa2f2617ee7b541d65",
+      "session_run_ms" : 622.8915,
+      "pixels" : [ 3824, 0, 5027, 0 ]
+    }, {
+      "end_to_end_ms" : 493.8775,
+      "image" : "0999e53af.jpg",
+      "components" : [ 1, 0, 0, 0 ],
+      "image_sha256" : "fa242139312ca2ca6073c0d966c1fe870f2f06366874cd554f3258e317cc9c57",
+      "logits_sha256" : "5c916b2d1317ca77d92f6b3ffd535c68f3ed04eb4bb678ffa7434fbf39358189",
+      "session_run_ms" : 465.6969,
+      "pixels" : [ 4275, 0, 0, 0 ]
+    }, {
+      "end_to_end_ms" : 434.6882,
+      "image" : "0c888ecb5.jpg",
+      "components" : [ 0, 0, 1, 3 ],
+      "image_sha256" : "89d238d4fd5b3edb210e1605ceccac2e1c29d43de4583ccc107e4bf63e06549b",
+      "logits_sha256" : "fa35b88d127a021b062a24afe12ee1ecff08007c247ff5a3f97f707a449f1e4f",
+      "session_run_ms" : 412.3258,
+      "pixels" : [ 0, 0, 10576, 16366 ]
+    }, {
+      "end_to_end_ms" : 424.0803,
+      "image" : "101648543.jpg",
+      "components" : [ 0, 1, 5, 0 ],
+      "image_sha256" : "3cf55815761ef2e97f8940268fc893514e3139e13d774fcad46a0077503234d9",
+      "logits_sha256" : "410147dec6ddee91552488f9ca4e6db7583ec465a421e9eec6c7ad1e83f65223",
+      "session_run_ms" : 403.3856,
+      "pixels" : [ 0, 3405, 5753, 0 ]
+    }, {
+      "end_to_end_ms" : 439.0501,
+      "image" : "1c1ca0221.jpg",
+      "components" : [ 0, 1, 1, 0 ],
+      "image_sha256" : "9872af9c35d9856d0ebc7f49e3e74ff3bc293b2722b0e0a9fbae676912d16acd",
+      "logits_sha256" : "41db03ca8d81abfcc33cf6d09483f439fffdb7fefa18f9241d81b299f21f5ac3",
+      "session_run_ms" : 417.7881,
+      "pixels" : [ 0, 2971, 4846, 0 ]
+    }, {
+      "end_to_end_ms" : 473.5071,
+      "image" : "1fc012f23.jpg",
+      "components" : [ 0, 0, 6, 2 ],
+      "image_sha256" : "380e57f68f524211bb91697d5deac5d14c773ad612b7c7737126455efab26f62",
+      "logits_sha256" : "0843e826c464b93db2112ddc8fcc0eff6afa2de8014f8726af2ef70b27f5dc70",
+      "session_run_ms" : 449.8831,
+      "pixels" : [ 0, 0, 35755, 51743 ]
+    }, {
+      "end_to_end_ms" : 442.939,
+      "image" : "ef24da2ba.jpg",
+      "components" : [ 1, 1, 1, 0 ],
+      "image_sha256" : "968bf98b5cf5b79f5ba6f304472e6748c3f21ca937c8fe47017e0bb8669a0844",
+      "logits_sha256" : "0b424aa72533d34d51f172857a2bbc887c9d7f96f3f5d721163b3fa5ef439006",
+      "session_run_ms" : 419.9788,
+      "pixels" : [ 745, 2011, 6018, 0 ]
+    } ],
+    "load_ms" : 116.7508,
+    "warmup_ms" : 945.007,
+    "session_run" : {
+      "p50_ms" : 438.2404,
+      "count" : 33,
+      "mean_ms" : 495.181703030303,
+      "p95_ms" : 657.7863
+    },
+    "end_to_end" : {
+      "p50_ms" : 473.5071,
+      "count" : 33,
+      "mean_ms" : 522.0636181818181,
+      "p95_ms" : 689.8791
+    }
+  }, {
+    "file" : "Unet_densenet201_v2_cleaned.onnx",
+    "sha256" : "76f41dd78b7fb8598ce2c4591cce6598fb51c9144cf1ed55aad793f972ddeeeb",
+    "samples" : [ {
+      "end_to_end_ms" : 344.0755,
+      "image" : "0025bde0c.jpg",
+      "components" : [ 0, 0, 6, 3 ],
+      "image_sha256" : "6af208ba023a824b457992e828f8e23fb3e3bec2790cd3be13afd5210710bca0",
+      "logits_sha256" : "f09ffd51bb5e250d145ae010ad82d7113a589d4d23d0c66774a58e82054110b0",
+      "session_run_ms" : 316.1656,
+      "pixels" : [ 0, 0, 26605, 18920 ]
+    }, {
+      "end_to_end_ms" : 327.0183,
+      "image" : "0088260da.jpg",
+      "components" : [ 0, 0, 3, 0 ],
+      "image_sha256" : "3f4d715b24ca6a6a6d3fbb448137086ffbce8314cfaa3e665506d89c6878c479",
+      "logits_sha256" : "8e329b1068b151f14f56096040ef2611f401027655b501fb68ebe8712dd82969",
+      "session_run_ms" : 301.3098,
+      "pixels" : [ 0, 0, 66070, 0 ]
+    }, {
+      "end_to_end_ms" : 317.0553,
+      "image" : "00ac8372f.jpg",
+      "components" : [ 1, 2, 0, 0 ],
+      "image_sha256" : "fd7f57afdb9b5f66d9906e6eb64c945fb41cab80c072ad5b46d12c46471ea225",
+      "logits_sha256" : "813841d2602b810671c9d7daa3640f422c486c0e1ac80d8cceb7f5183262f787",
+      "session_run_ms" : 295.0426,
+      "pixels" : [ 1204, 8757, 0, 0 ]
+    }, {
+      "end_to_end_ms" : 324.4352,
+      "image" : "00af2671f.jpg",
+      "components" : [ 0, 0, 5, 0 ],
+      "image_sha256" : "39011422f78fba6367f56c4cae79075fd188d5758a5f68f1658dd114457f03a6",
+      "logits_sha256" : "3408299900f62e41025dc04cb7719f01aaadf2424fad1c1928d81f0d01054914",
+      "session_run_ms" : 302.4786,
+      "pixels" : [ 0, 0, 35998, 0 ]
+    }, {
+      "end_to_end_ms" : 324.4838,
+      "image" : "08de8df60.jpg",
+      "components" : [ 6, 0, 3, 0 ],
+      "image_sha256" : "1a0867457dd68ae68aa20b24d5563b096093058a1dcf0feaeca8484249111044",
+      "logits_sha256" : "3ed5285c36c735e58eed585bc17521bdc5ad3fe7a511a69239dc5ede966e373e",
+      "session_run_ms" : 296.8689,
+      "pixels" : [ 4065, 0, 6422, 0 ]
+    }, {
+      "end_to_end_ms" : 341.1879,
+      "image" : "0999e53af.jpg",
+      "components" : [ 1, 0, 0, 0 ],
+      "image_sha256" : "fa242139312ca2ca6073c0d966c1fe870f2f06366874cd554f3258e317cc9c57",
+      "logits_sha256" : "866cee7c6d5ff4a62b92a40dda46e1c02953d39cef6fe8226269a1feb8f7bfc9",
+      "session_run_ms" : 317.3013,
+      "pixels" : [ 4520, 0, 0, 0 ]
+    }, {
+      "end_to_end_ms" : 346.1367,
+      "image" : "0c888ecb5.jpg",
+      "components" : [ 0, 0, 1, 3 ],
+      "image_sha256" : "89d238d4fd5b3edb210e1605ceccac2e1c29d43de4583ccc107e4bf63e06549b",
+      "logits_sha256" : "624fa1ff5510f12867e20337f2d4d314b659b0b5243042b9a8a620b937041c4e",
+      "session_run_ms" : 315.6978,
+      "pixels" : [ 0, 0, 7968, 16045 ]
+    }, {
+      "end_to_end_ms" : 309.882,
+      "image" : "101648543.jpg",
+      "components" : [ 0, 1, 3, 0 ],
+      "image_sha256" : "3cf55815761ef2e97f8940268fc893514e3139e13d774fcad46a0077503234d9",
+      "logits_sha256" : "681998546a3600b48efac329df6726760db0128f847dd2ede01491c7ea332108",
+      "session_run_ms" : 286.7629,
+      "pixels" : [ 0, 3518, 6215, 0 ]
+    }, {
+      "end_to_end_ms" : 312.8859,
+      "image" : "1c1ca0221.jpg",
+      "components" : [ 0, 1, 1, 0 ],
+      "image_sha256" : "9872af9c35d9856d0ebc7f49e3e74ff3bc293b2722b0e0a9fbae676912d16acd",
+      "logits_sha256" : "fad785df964fd1c14dcf44c51a5b9a87e00a3660b67913ca9d88d47c53930354",
+      "session_run_ms" : 292.1416,
+      "pixels" : [ 0, 2883, 4164, 0 ]
+    }, {
+      "end_to_end_ms" : 317.7702,
+      "image" : "1fc012f23.jpg",
+      "components" : [ 0, 0, 3, 2 ],
+      "image_sha256" : "380e57f68f524211bb91697d5deac5d14c773ad612b7c7737126455efab26f62",
+      "logits_sha256" : "b14a51da0f5000e7d376d0b619a4337547ed65c1836759676b6f2f7b2808c107",
+      "session_run_ms" : 294.9618,
+      "pixels" : [ 0, 0, 15240, 54718 ]
+    }, {
+      "end_to_end_ms" : 325.6797,
+      "image" : "ef24da2ba.jpg",
+      "components" : [ 1, 1, 1, 0 ],
+      "image_sha256" : "968bf98b5cf5b79f5ba6f304472e6748c3f21ca937c8fe47017e0bb8669a0844",
+      "logits_sha256" : "b840e5a143b027a3a35dff37783e0b0f6ac04360509441ac7ce914b0a5e026e9",
+      "session_run_ms" : 301.9486,
+      "pixels" : [ 992, 2128, 5505, 0 ]
+    } ],
+    "load_ms" : 232.5354,
+    "warmup_ms" : 622.8421,
+    "session_run" : {
+      "p50_ms" : 301.3098,
+      "count" : 33,
+      "mean_ms" : 303.6002363636364,
+      "p95_ms" : 343.3388
+    },
+    "end_to_end" : {
+      "p50_ms" : 325.6797,
+      "count" : 33,
+      "mean_ms" : 327.7879090909091,
+      "p95_ms" : 365.8925
+    }
+  } ]
+}

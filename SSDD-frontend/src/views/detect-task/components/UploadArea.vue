@@ -12,10 +12,14 @@ const props = withDefaults(
     maxFiles?: number
     /** 上传进度（0-100），传入时展示进度条 */
     uploadProgress?: number | null
+    buttonLabel?: string
+    loadingLabel?: string
   }>(),
   {
     maxFiles: 20,
     uploadProgress: null,
+    buttonLabel: '开始检测',
+    loadingLabel: '检测中...',
   },
 )
 
@@ -149,7 +153,7 @@ defineExpose({ clearFiles })
         @click="startDetect"
       >
         <ElIcon v-if="!loading"><Cpu /></ElIcon>
-        {{ loading ? '检测中...' : '开始检测' }}
+        {{ loading ? loadingLabel : buttonLabel }}
       </ElButton>
     </div>
   </div>

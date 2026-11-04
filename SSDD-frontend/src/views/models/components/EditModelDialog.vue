@@ -24,13 +24,14 @@ interface MetricForm {
   dice: number | null
   fps: number | null
   file_size: number | null
+  metric_source: string | null
 }
 
 const { formModel: metricModel, formProps: metricProps, formRef: metricRef, validate: validateMetric } = useSsForm<MetricForm>(
   editModelMetricConfig,
   {
     rowCount: 2,
-    defaultValue: { miou: null, precision: null, recall: null, dice: null, fps: null, file_size: null },
+    defaultValue: { miou: null, precision: null, recall: null, dice: null, fps: null, file_size: null, metric_source: null },
   },
 )
 
@@ -45,6 +46,7 @@ function open(model: Model) {
   metricModel.dice = model.dice
   metricModel.fps = model.fps
   metricModel.file_size = model.file_size
+  metricModel.metric_source = model.metric_source
   baseRef.value?.clearValidate()
   metricRef.value?.clearValidate()
 }
@@ -62,7 +64,7 @@ async function handleSubmit() {
     recall: metricModel.recall,
     dice: metricModel.dice,
     fps: metricModel.fps,
-    file_size: metricModel.file_size,
+    metric_source: metricModel.metric_source || null,
   }
 
   submitting.value = true

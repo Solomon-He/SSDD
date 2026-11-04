@@ -1,99 +1,131 @@
 # SSDD 后端
 
-Java 17、Spring Boot 3.5.16，钢铁表面缺陷检测系统的后端工程。目前完成 P0 模型验证和 P1 工程/数据库基础设施，检测模型仅支持 V2。账号、权限及检测业务接口按后续阶段开发。
+Java 17、Spring Boot 3.5.16、MySQL / Flyway、Redis、ONNX Runtime Java 1.31.1。仅支持 V2 四通道多标签模型。main 提供单图与同步批量；async-batch 另含 P5.5 持久异步批量。
 
-## 本机启动
+克隆、数据库创建、前端启动和首次模型导入步骤见 [根 README](../README.md)。本文件中的命令均在后端根目录执行；IDEA 的 Project SDK、Maven runner/importer 也应选择 JDK 17，Maven 使用项目 Wrapper 3.9.16。
 
-工作目录：`D:\开发\SSDD\SSDD-backend`。
+## 本地配置
 
-1. 使用 JDK 17，IDEA 的 Project SDK、Maven runner/importer 也选择 17；Maven home 选择项目 Wrapper（3.9.16）。
-2. 确认 MySQL 运行。本机已创建 `ssdd`，无需重复建库；新环境可执行 `scripts/sql/create-database.sql`。
-3. 本机连接信息已放在根目录 `application-local.yml`，该文件被 `.gitignore` 排除，不会打进 JAR。新环境复制 `application-local.example.yml` 并填写，或设置 `SSDD_DB_USERNAME`、`SSDD_DB_PASSWORD`。
-4. 在后端根目录运行：
+复制 `application-local.example.yml` 为 `application-local.yml`。dev profile 读取当前工作目录中的该文件。首次可配置为：
+
+```yaml
+ssdd:
+  database:
+    username: ssdd_app
+    password: '<自己的数据库密码>'
+  auth:
+    signing-key: '<至少32个随机字节的Base64密钥>'
+  bootstrap-admin:
+    enabled: true
+    email: '<自己的管理员邮箱>'
+    display-name: '<显示名>'
+    password: '<自己的管理员密码>'
+spring:
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      # 有认证时填写 username/password
+```
+
+数据库默认连接本机 3306 的 `ssdd`。其他地址可设置 `SSDD_DB_URL`，或在上述 `ssdd.database` 下添加完整的 `url`。管理员仅在显式启用时创建；已有管理员不会被重置密码或被默认账号替换。成功创建后关闭 bootstrap 开关，再使用该账号登录。
+
+PowerShell 生成随机签名密钥：
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+$rng.Dispose()
+```
+
+将输出保存到本地配置，勿提交或发送给他人。数据默认写入 `./var/ssdd`；该目录在首次写入时创建，不需要从仓库获取。
+
+## 启动与入口
 
 ```powershell
 .\mvnw.cmd spring-boot:run
+# 或先打包再运行：
+.\mvnw.cmd -DskipTests package
+java -jar target/SSDD-backend-0.0.1-SNAPSHOT.jar
 ```
 
-默认使用 `dev` profile、端口 3000、数据库 `127.0.0.1:3306/ssdd`，兼容现有前端。Flyway 会自动校验并执行尚未运行的迁移。当前本机 MySQL 为 **8.0.34**，本轮在此版本验证；MySQL 8.4 容器路径尚未在本机执行。
-
-若系统默认仍是 JDK 25，需先将当前终端的 `JAVA_HOME`/`PATH` 指向 JDK 17。本轮临时验证 JDK 放在 `target/p1-tools/jdk17/`；日常 IDEA SDK 应使用稳定安装目录，避免清理 target 后失效。
-
-## 可用入口
+Linux/macOS 将 `mvnw.cmd` 换成 `./mvnw`。`-DskipTests package` 只表示生成工件，不是完成测试。默认端口 3000，开发环境允许前端 localhost/127.0.0.1:5173。
 
 | 入口 | 用途 |
 | --- | --- |
-| `http://localhost:3000/health` | 基础存活，返回 `{status,timestamp,version}` |
-| `http://localhost:3000/actuator/health/readiness` | 数据库 readiness，只返回状态，不返回连接详情 |
-| `http://localhost:3000/actuator/health/liveness` | 进程 liveness |
-| `http://localhost:3000/swagger-ui.html` | 开发环境 API 文档页面 |
-| `http://localhost:3000/v3/api-docs` | 开发环境 OpenAPI JSON |
+| `/health` | 基础存活 |
+| `/actuator/health/readiness` | MySQL 与 Redis 就绪状态 |
+| `/actuator/health/inference` | 活动模型就绪状态；未激活模型时为 503 |
+| `/swagger-ui.html`、`/v3/api-docs` | dev 下的接口文档 |
+| `/api/auth`、`/api/admin/users` | 账号、会话、权限和用户管理 |
+| `/api/models`、`/api/models/runtime` | 模型上传、激活、元信息与运行状态 |
+| `/api/detect`、`/api/detect/batch` | 单图、最多20张的同步批量检测 |
+| `/api/detect/records`、`/api/logs` | 权限内的历史与日志，支持 CSV 导出 |
+| `/api/admin/stats` | 管理员统计 |
+| `/api/detect/tasks` | 仅 async-batch：POST 202 受理，GET /{UUID} 查询任务 |
 
-当前 API 文档只承诺已实现的健康接口。`/api/auth`、`/api/detect` 等业务接口尚未实现，返回统一 404；表已建成不表示业务功能已完成。
+## CPU、GPU 与模型
 
-## 配置
+默认 CPU 工件不依赖 CUDA。两个原始模型必须通过 Git LFS 获取，再由管理员从模型管理页面上传和激活；模型、测试图片都不打入业务 JAR。运行权重存于数据目录的 models 子目录，不提供公开下载。
 
-| 环境变量 | 默认/要求 |
+GPU 环境须安装与 ORT GPU 1.31.1 匹配的驱动、CUDA/cuDNN。本机已验证 Windows / RTX 5080 / CUDA 13 / cuDNN 9.20；其他组合需要独立验证。构建和启动示例：
+
+```powershell
+.\mvnw.cmd -Pgpu -DskipTests package
+$env:PATH = '<已验证 CUDA/cuDNN DLL 目录>;' + $env:PATH
+$env:SSDD_INFERENCE_DEVICE = 'cuda'
+java -jar target/SSDD-backend-0.0.1-SNAPSHOT-gpu.jar
+```
+
+设备支持 cpu/cuda/auto，强制 cuda 初始化失败不回退；auto 仅在初始化或预热失败时回退并记录原因。给 CPU 工件设置 cuda 不会增加 CUDA 能力。不要在同一工件中混用 CPU/GPU 两种 ORT 依赖。
+
+async-batch 的异步任务固定提交时模型、参数与实际设备。MySQL 保存状态和恢复依据，Redis 缓存进度，丢失可回查数据库；认证及检测限流仍保留对 Redis 的依赖。默认待处理容量 8、最多尝试3次、单次预算5分钟、总期限1小时；成功后整批提交，暂停浏览器查询不取消服务器任务。`SSDD_TASK_WORKER_ENABLED=false` 可暂停消费，仍可按容量受理。当前为单实例受管文件方案，不提供分布式 GPU 调度或计算恰好一次保证。
+
+## 迁移、数据与部署
+
+Flyway 从 `src/main/resources/db/migration/` 自动执行迁移；main 为 V5 / 11 张业务表，async-batch 为 V6 / 13 张，另有 flyway_schema_history。迁移不导入业务账号、模型或旧结果，clean 与自动 baseline 关闭。
+
+两个分支部署到不同数据库及数据目录。已经执行 V6 的数据库不能直接由只有 V5 迁移的 main 使用；切换分支验证时用独立空库，勿删除迁移历史来规避校验。
+
+prod 不读取开发本地配置，需要在进程环境中提供：
+
+| 变量 | 要求 / 默认值 |
 | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | 默认 dev；部署时设 prod |
-| `SSDD_PORT` | 3000 |
-| `SSDD_DB_URL` | dev 默认本机 ssdd；prod 必填完整 MySQL JDBC URL |
-| `SSDD_DB_USERNAME`、`SSDD_DB_PASSWORD` | 环境变量或 dev 的 application-local.yml；缺失时启动失败并给出配置提示 |
-| `SSDD_DATA_DIR` | dev 默认 ./var/ssdd；prod 必填，P3/P4 再实现实际存储操作 |
-| `SSDD_CORS_ALLOWED_ORIGINS` | prod 可设逗号分隔的明确 origin；默认不开放跨域 |
+| `SPRING_PROFILES_ACTIVE` | prod |
+| `SSDD_DB_URL` | 完整 MySQL JDBC URL，建议包含 connectionTimeZone=UTC、forceConnectionTimeZoneToSession=true |
+| `SSDD_DB_USERNAME`、`SSDD_DB_PASSWORD` | 自己的数据库账号与密码 |
+| `SSDD_JWT_SIGNING_KEY` | 至少32随机字节的 Base64，稳定保存 |
+| `SSDD_DATA_DIR` | 可写、持久的数据绝对路径 |
+| `SSDD_REDIS_HOST/PORT/DATABASE` | 默认 127.0.0.1 / 6379 / 0 |
+| `SSDD_REDIS_USERNAME/PASSWORD` | 有认证时填写 |
+| `SSDD_REDIS_NAMESPACE` | 不同应用/环境使用不同值 |
+| `SSDD_PORT` | 默认 3000 |
+| `SSDD_CORS_ALLOWED_ORIGINS` | 逗号分隔的明确前端 origin |
+| `SSDD_BOOTSTRAP_ADMIN_ENABLED/EMAIL/NAME/PASSWORD` | 首次初始化需要时配置，完成后关闭 |
+| `SSDD_INFERENCE_DEVICE`、`SSDD_GPU_DEVICE_ID` | 默认 cpu / 0 |
 
-开发环境默认允许 `http://localhost:5173`、`http://127.0.0.1:5173`。若 Vite 使用其他端口，在本地配置中覆盖 `ssdd.cors.allowed-origins`。CORS 仅作用于 `/api/**`，允许 Bearer/请求 ID/幂等键请求头，暴露下载文件名和请求 ID 响应头。
+prod 默认关闭 Swagger/OpenAPI，仅暴露受限 health。前端构建前配置 `VITE_API_BASE_URL` 指向后端，静态服务器需要支持 SPA 路由回退，后端 CORS 配置为该前端 origin。直接连接 IP 的限流策略未配置可信代理，不信任任意客户端转发头。
 
-生产 profile 不读取开发凭据文件，Swagger/OpenAPI 默认关闭，Actuator 只暴露 health。部署时显式提供数据库 URL、凭据和数据目录。数据库连接采用 UTC 会话时间，业务时间对外使用 ISO 8601。
-
-## 数据库迁移
-
-- `V1__create_users_and_sessions.sql`：用户、资料、稳定登录会话、刷新令牌历史。
-- `V2__create_v2_models.sql`：V2 模型元信息和唯一活动模型指针。
-- `V3__create_detections_and_audit.sql`：检测批次、检测记录、类别统计、操作日志。
-
-共 10 张业务表，另有 `flyway_schema_history`。初始只插入一行空活动模型指针，不创建业务账号，不自动导入模型。已有迁移应用后不要改内容；后续变更新增 `V4__...sql`。Flyway clean 和自动 baseline 已关闭，不能用开启 baseline 掩盖非空库的结构差异。
+头像、权重副本、检测原图及 PNG、导出临时文件和异步原始输入都在数据目录内。结果图片通过授权后签发的短期 URL 读取，URL 过期后重新查询详情；模型文件没有公开下载路由。数据库与数据目录应配套备份和恢复。
 
 ## 构建与测试
 
+JDK17 执行 `mvnw.cmd verify`。完整测试需要 MySQL 和 Redis；默认 MySQL 通过 Testcontainers 创建临时容器，也可显式使用本地 MySQL：
+
 ```powershell
+$env:SSDD_TEST_MYSQL_ENABLED = 'true'
+$env:SSDD_TEST_MYSQL_USERNAME = '<允许创建测试库的账号>'
+$env:SSDD_TEST_MYSQL_PASSWORD = '<测试账号密码>'
+$env:SSDD_REDIS_HOST = '127.0.0.1'
+$env:SSDD_REDIS_PORT = '6379'
 .\mvnw.cmd verify
 ```
 
-Web/配置测试无需数据库。真实 MySQL 集成测试支持两种方式：本地显式配置，或可用 Docker 下由 Testcontainers 启动 MySQL；两者均不可用时集成测试会跳过，不表示数据库已通过验收。
+可选 `SSDD_TEST_MYSQL_ADMIN_URL` 需指向服务根 URL，不包含已有库名。测试只创建并删除随机 `ssdd_p1_test_*` 数据库，Redis 使用独立命名空间，不清空用户服务。由于环境不可用而跳过的集成测试不视为验证通过。
 
-本地集成测试配置（凭据通过本机环境注入）：
+原始模型回归需要 LFS 权重及 `test-images/`，固定 CPU 基准和 GPU 容差保留在 `src/test/resources/inference/`，不依赖 docs/tools。已配置 GPU 环境可额外运行 `mvnw.cmd -Pgpu -Dtest=DetectionGpuVerification verify`。
 
-```powershell
-$env:SSDD_TEST_MYSQL_ENABLED='true'
-$env:SSDD_TEST_MYSQL_USERNAME='root'
-$env:SSDD_TEST_MYSQL_PASSWORD='<本机密码>'
-.\mvnw.cmd verify
-```
-
-可选 `SSDD_TEST_MYSQL_ADMIN_URL` 指向 MySQL 服务根 URL，不能包含业务库名。测试创建随机 `ssdd_p1_test_<32位hex>` 库，结束后仅清理自己创建的库；不向 `ssdd` 写测试数据。Docker 默认镜像 `mysql:8.4.8`，可用 `SSDD_TEST_MYSQL_IMAGE` 覆盖。
-
-完整验收还可运行 `scripts/Verify-P1.ps1 -JavaExecutable '<JDK17>/bin/java.exe'`，需为 prod 子进程提供 `SSDD_DB_URL`、`SSDD_DB_USERNAME`、`SSDD_DB_PASSWORD`、`SSDD_DATA_DIR`。脚本在端口 3000 临时启动 dev、dev 重启和 prod，验证后停止自身启动的进程；不会停止其他已占用端口的服务。首次运行会应用 `ssdd` 的迁移。
-
-## 目录与文档
-
-```text
-src/main/java/org/ssdd/
-  common/api/          统一响应与分页
-  common/exception/    统一错误映射
-  common/web/          请求 ID 与 Servlet 错误兜底
-  config/              数据库、跨域、分页、OpenAPI 配置
-  health/              存活检查
-src/main/resources/
-  db/migration/        Flyway SQL
-models/                原始 V2 ONNX，不公开、不打入 JAR
-test-images/           11 张 P0 验证样例，不打入 JAR
-tools/p0-model-validation/
-scripts/               建库及打包烟雾验证
-docs/p0/               模型契约及验证结果
-docs/p1/               工程和数据库验收结果
-```
-
-- [P0 验证报告](docs/p0/P0契约与模型验证报告.md)
-- [P1 实施与验收报告](docs/p1/P1工程与数据库验收报告.md)
-- [总体技术选型与开发计划](../docs/后端技术选型与开发计划.md)
+前端测试在前端目录执行 `pnpm test:p5`；async-batch 另执行 `pnpm test:p55`，然后 `pnpm build`。测试入口保存在 tests 下，不依赖 scripts 目录。独立模型诊断工具、个人开发计划和历史验收资料仅在本地保留，不是克隆后构建和运行的依赖。

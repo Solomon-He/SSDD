@@ -40,6 +40,11 @@ const pieData = computed(() =>
 
 <template>
   <div class="single-result">
+    <ElAlert type="info" :closable="false" title="预览图会压缩多类别重叠信息；统计来自四通道掩码。图片链接默认有效期为 15 分钟，过期后请重新打开检测详情。" />
+    <div v-if="result.inference_config_snapshot" class="section-title">
+      实际设备：{{ result.inference_config_snapshot.actual_device.toUpperCase() }}
+      <span v-if="result.inference_config_snapshot.fallback_reason">（CUDA 初始化失败，已回退 CPU）</span>
+    </div>
     <!-- 三宫格图片对比 -->
     <div class="image-compare">
       <div v-for="img in images" :key="img.label" class="image-cell">
@@ -53,7 +58,7 @@ const pieData = computed(() =>
       <div class="summary-cards">
         <div class="summary-card">
           <span class="card-value">{{ result.defect_count }}</span>
-          <span class="card-label">缺陷总数</span>
+          <span class="card-label">缺陷区域数</span>
         </div>
         <div class="summary-card">
           <span class="card-value">{{ defectRatioPercent }}%</span>
