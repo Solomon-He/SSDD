@@ -1,37 +1,90 @@
+<div align="center">
+
 # SSDD · 钢铁表面缺陷检测系统
 
-Vue 3 + Java 17 / Spring Boot 3.5.16，提供钢铁表面缺陷分割、账号权限、模型管理、历史记录、CSV、操作日志与管理员统计。仅支持 V2 四通道多标签模型，普通构建使用 CPU，也可单独构建 CUDA 工件。
+**上传钢板图像，查看像素级缺陷掩码，并追溯每次检测的模型与结果。**
 
-| 分支 | 功能范围 |
+`Vue 3` · `Java 17` · `Spring Boot 3.5` · `ONNX Runtime`
+
+[运行示例](#运行示例) · [核心能力](#核心能力) · [快速开始](#快速开始) · [技术架构](#技术架构) · [构建与验证](#构建与验证)
+
+</div>
+
+## 运行示例
+
+![首页仪表盘，显示检测概况、活跃模型、近期记录和缺陷趋势](./assets/readme/dashboard.png)
+
+**首页仪表盘** · 查看当前模型、近期检测记录和缺陷分布。
+
+<details>
+<summary><strong>单张检测</strong> · 查看原图、掩码、叠加图和缺陷统计</summary>
+
+![单张检测的原图、掩码、叠加图与分类统计](./assets/readme/single-detection.png)
+
+</details>
+
+<details>
+<summary><strong>同步批量</strong> · 查看逐图结果和缺陷面积占比</summary>
+
+![同步批量检测结果及缺陷面积占比气泡图](./assets/readme/sync-batch.png)
+
+</details>
+
+*截图取自本地 `async-batch` 分支。图中的记录与耗时是该次运行的样例。异步批量入口仅在该分支显示。*
+
+## 核心能力
+
+| 能力 | 可以做什么 |
 | --- | --- |
-| `main` | P0～P5：单张与同步批量检测，批量最多 20 张、整批提交 |
-| `async-batch` | 包含 main 的功能，并增加 P5.5 异步批量、持久任务、进度查询、受限重试与重启恢复 |
+| 四类缺陷分割 | 使用 V2 四通道多标签模型，识别凹坑、边缘裂纹、划痕刮伤和氧化铁皮 |
+| 单张与同步批量 | 查看原图、掩码和叠加图。同步批量最多 20 张，检测结果整批提交 |
+| 结果追溯 | 查询历史记录、导出 CSV，查看模型版本、实际推理设备和分类统计 |
+| 模型管理 | 管理员可上传、校验和激活 ONNX 模型。默认使用 CPU，可按需构建 CUDA 版本 |
+| 权限与运营 | 支持用户与管理员权限、操作日志、检测概况和趋势图 |
 
-## 环境要求
+### 分支选择
 
-- Git 和 Git LFS，用于获取两个原始 ONNX 权重。
-- JDK 17，使用仓库自带 Maven Wrapper，无需单独安装 Maven。
-- MySQL 8.0 或 8.4；Redis 服务。已执行验证的数据库版本为 8.0.34 / 8.4.8，Redis 为 8.10.2。
-- Node.js 24、pnpm 11.8.0。前端 `package.json` 固定包管理器，`pnpm-lock.yaml` 固定依赖。
-- CPU 部署不需要 Python、CUDA 或 GPU。
+| 分支 | 检测模式 | 数据库迁移 |
+| --- | --- | --- |
+| `main` | 单张与同步批量（P0～P5） | V1～V5 |
+| `async-batch` | 在 `main` 基础上增加持久异步任务、进度查询、受限重试和重启恢复（P5.5） | V1～V6 |
 
-## 克隆与获取权重
+> 两个分支请使用各自的数据库和数据目录。已执行 V6 的数据库应继续搭配 `async-batch` 使用。
+
+## 快速开始
+
+### 1. 准备环境
+
+| 组件 | 本地运行要求 |
+| --- | --- |
+| 源码与模型 | Git、Git LFS |
+| 后端 | JDK 17，仓库自带 Maven Wrapper |
+| 前端 | Node.js 24、pnpm 11.8.0 |
+| 数据服务 | MySQL 8.0 或 8.4、Redis |
+
+以下流程使用默认的 CPU 推理。CUDA 环境和打包方式见 [后端部署说明](./SSDD-backend/README.md)。
+
+### 2. 克隆项目并获取权重
 
 ```bash
 git lfs install
 git clone https://github.com/Solomon-He/SSDD.git
 cd SSDD
-# 需要异步批量时，切换到 async-batch 分支
-# git switch async-batch
+# 如需异步批量，先执行 git switch async-batch
 git lfs pull
 git lfs fsck
 ```
 
-两个权重在 `SSDD-backend/models/`，分别约 104 MB、115 MB。若文件只有几行指针文本，先完成 LFS 下载，不能直接上传指针文件。
+模型文件位于 `SSDD-backend/models/`。下载后确认拿到的是实际 ONNX 文件。若打开后只有几行 LFS 指针文本，请重新执行 `git lfs pull`。
 
-## 初始化数据库
+| 模型 | 权重文件 | 约占空间 |
+| --- | --- | ---: |
+| U-Net++ / ResNet34 | `UnetPlusPlus_resnet34_v2_cleaned.onnx` | 104 MB |
+| U-Net / DenseNet201 | `Unet_densenet201_v2_cleaned.onnx` | 115 MB |
 
-连接自己的 MySQL 服务，用具备建库和授权权限的账号执行以下 SQL；将密码占位符替换为自己的随机密码：
+### 3. 初始化 MySQL
+
+启动 MySQL 和 Redis。使用有建库和授权权限的 MySQL 账号执行以下命令，将示例密码替换为你自己的密码。
 
 ```sql
 CREATE DATABASE IF NOT EXISTS ssdd
@@ -40,17 +93,16 @@ CREATE USER IF NOT EXISTS 'ssdd_app'@'localhost' IDENTIFIED BY '<自己的数据
 GRANT ALL PRIVILEGES ON ssdd.* TO 'ssdd_app'@'localhost';
 ```
 
-该示例用于本地 MySQL。容器或其他主机上的数据库应按实际客户端来源配置 MySQL 账号授权。无需手工建表，后端首次启动通过 `src/main/resources/db/migration/` 中的 Flyway 迁移创建表。
+容器或远程数据库应按实际客户端来源设置 MySQL 账号授权。首次启动时，Flyway 会自动建表。
 
-## 启动后端
+### 4. 配置并启动后端
 
-1. 在 `SSDD-backend` 中将 `application-local.example.yml` 复制为 `application-local.yml`。
-2. 填写数据库账号、密码和 JWT 签名密钥，配置自己的 Redis 地址、端口和密码。示例 Redis 端口是 **6380**，若服务使用默认端口请改为 **6379**。
-3. 首次启动在本地配置中将 `ssdd.bootstrap-admin.enabled` 设为 true，并填写自己的管理员邮箱、显示名和密码。初始化成功后改回 false。
-4. 确认 `java -version` 为 17，在后端目录执行：
+1. 在 `SSDD-backend/` 中将 `application-local.example.yml` 复制为 `application-local.yml`。
+2. 填写数据库凭据、JWT 签名密钥和 Redis 连接配置。Redis 示例端口是 `6380`，请按实际服务端口修改（默认 Redis 端口是 `6379`）。[配置示例与密钥生成方式](./SSDD-backend/README.md#本地配置)
+3. 首次启动时启用 `ssdd.bootstrap-admin.enabled`，并填写管理员邮箱、显示名和密码。初始化成功后关闭该开关。
+4. 确认 `java -version` 为 17，在 `SSDD-backend/` 中运行对应命令。
 
 ```powershell
-# Windows
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -59,51 +111,58 @@ GRANT ALL PRIVILEGES ON ssdd.* TO 'ssdd_app'@'localhost';
 ./mvnw spring-boot:run
 ```
 
-生成 JWT 密钥的方法、完整配置和打包运行见 [后端 README](SSDD-backend/README.md)。本地配置不入库，不能复用别人的密钥或账号。
+| 本地入口 | 用途 |
+| --- | --- |
+| [localhost:3000/health](http://localhost:3000/health) | 服务存活检查 |
+| [localhost:3000/actuator/health/readiness](http://localhost:3000/actuator/health/readiness) | MySQL 与 Redis 就绪检查 |
+| [localhost:3000/swagger-ui.html](http://localhost:3000/swagger-ui.html) | 开发环境 API 文档 |
 
-后端默认 `http://localhost:3000`。`/health` 是存活检查，`/actuator/health/readiness` 检查数据库与 Redis；开发环境的 `/swagger-ui.html` 提供接口说明。首次尚未激活模型时推理健康为 503，账号与模型管理仍可使用。
+### 5. 启动前端并完成第一次检测
 
-## 启动前端并导入模型
-
-在 `SSDD-frontend` 目录执行：
+打开另一个终端，在 `SSDD-frontend/` 中运行以下命令。
 
 ```bash
-# 若尚未安装 pnpm：npm install -g pnpm@11.8.0
+# 首次安装 pnpm 时运行 npm install -g pnpm@11.8.0
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开终端显示的前端地址，默认 `http://localhost:5173`。使用刚初始化的管理员登录，在“模型管理”上传 `SSDD-backend/models/` 中的真实 ONNX 文件，选择 V2 / 四通道，填写模型名称、版本并激活。首次启动不自动导入模型，也不携带任何历史结果或默认账号。
+1. 打开终端显示的前端地址，默认是 [localhost:5173](http://localhost:5173)，使用刚初始化的管理员账号登录。
+2. 进入「模型管理」，上传 `SSDD-backend/models/` 中的一个 ONNX 权重。选择 V2 / 四通道，填写模型名称和版本，然后激活。
+3. 进入「缺陷检测」，从 [示例图片](./SSDD-backend/test-images/) 选择一张上传，即可查看缺陷掩码与叠加结果。
 
-激活后到检测页上传 `SSDD-backend/test-images/` 中的图片即可检测。`async-batch` 分支额外提供“异步批量”；保留任务号可恢复查询，暂停页面轮询不会取消后台任务。
+如果更改了前后端地址或端口，请同时核对 API 地址、图片代理和 CORS 配置。[前端联调说明](./SSDD-frontend/README.md)
 
-若前端端口不是 5173，在后端本地配置的 `ssdd.cors.allowed-origins` 中加入对应 origin；若后端地址变化，调整前端 `.env.development` 的 `VITE_API_BASE_URL`。详细接口约定见 [API.md](SSDD-frontend/API.md)。
+## 技术架构
 
-## 构建与本地打包运行
+| 层级 | 技术与职责 |
+| --- | --- |
+| Web 界面 | Vue 3、TypeScript、Vite、Element Plus、Pinia 和 ECharts，负责上传、结果对照与统计可视化 |
+| API 与权限 | Java 17、Spring Boot 3.5.16 和 MyBatis-Plus，负责登录鉴权、模型生命周期、检测与导出 |
+| 推理 | ONNX Runtime Java，加载 V2 模型，输出四类掩码、叠加图及区域统计 |
+| 数据 | MySQL / Flyway 保存业务记录，Redis 用于限流与统计缓存，本地数据目录保存权重副本与图片。异步任务进度缓存仅用于 `async-batch` |
 
-```powershell
-# SSDD-backend 工作目录；仅打包，完整测试另见后端 README
-.\mvnw.cmd -DskipTests package
-java -jar target/SSDD-backend-0.0.1-SNAPSHOT.jar
-```
+生产部署时应配套备份 MySQL 和数据目录。本机配置、凭据和运行文件由各部署环境管理。[后端生产配置](./SSDD-backend/README.md#迁移数据与部署)
 
-JAR 在后端目录启动时默认使用 dev profile，并读取该工作目录的本地配置。前端在其目录运行 `pnpm build`，然后 `pnpm preview --host 127.0.0.1 --port 5173` 可预览本地构建；正式部署应使用静态服务器并按 [后端 README](SSDD-backend/README.md) 配置 prod 环境。
+## 构建与验证
 
-## 仓库内容
+前端在 `SSDD-frontend/` 中执行 `pnpm test:p5` 和 `pnpm build`。在 `async-batch` 上可额外执行 `pnpm test:p55`。构建产物位于 `dist/`，可用 `pnpm preview --host 127.0.0.1 --port 5173` 本地预览。
 
-保留前后端源码、数据库迁移、配置示例、构建锁文件、Wrapper、模型 LFS 指针、示例图片和必要测试资源。后端测试所需的固定基准数据放在 `src/test/resources/inference/`，前端状态测试放在 `tests/`。
+后端在 `SSDD-backend/` 中使用 JDK 17 执行 `mvnw.cmd verify`（Linux / macOS 为 `./mvnw verify`）。数据库集成测试需要可用的 Docker 或显式配置的本地 MySQL，完整验证还需要 Redis 和 Git LFS 权重。[后端验证与打包说明](./SSDD-backend/README.md#构建与测试)
 
-任意层级的 `docs/`、`scripts/`、`tools/`、`var/` 均被 Git 忽略。它们可在开发者本机保留，克隆后无需这些目录即可构建和运行；运行时会按需创建数据目录。历史提交仍可能包含旧资料，本次清理不改写历史。
+2026-11-04 在独立检出中完成的验收记录如下。测试环境为 Windows、MySQL 8.0.34 / 8.4.8、Redis 8.10.2。
 
-账号、上传模型副本、头像、检测结果及异步原始输入保存在配置的数据目录中；`application-local.yml`、环境凭据、依赖和构建产物不提交。日常部署须同时备份 MySQL 和数据目录。
-
-## 干净检出验证
-
-2026-11-04，在仅包含待提交跟踪文件的独立副本中验证；副本不携带上述四类目录、本地配置、依赖或旧构建，依赖按锁文件重新安装。
-
-| 分支 | 后端 JDK17 verify | 前端状态测试与构建 | 独立空库打包启动 |
+| 分支 | 后端测试 | 前端验证 | 独立空库运行 |
 | --- | --- | --- | --- |
-| main | 101 项通过，0 跳过 | 5 项通过，构建通过 | V5 迁移、临时非 root 数据库账号、管理员初始化、模型上传/激活、单图与同步批量通过 |
-| async-batch | 123 项通过，0 跳过 | 13 项通过，构建通过 | V6 同流程，并验证异步任务成功发布 |
+| `main` | 101 项通过，0 跳过 | 5 项状态测试与构建通过 | V5 迁移、管理员初始化、模型激活、单张与同步批量 |
+| `async-batch` | 123 项通过，0 跳过 | 13 项状态测试与构建通过 | V6 迁移，另验证异步批量任务成功发布 |
 
-迁移后的 GPU 测试资源另通过两个模型 × 11 图的原生对照。以上执行环境为本机 Windows、MySQL 8.0.34 和 Redis 8.10.2；HTTP 启动与检测验证不等同于 Linux 部署或浏览器整页 E2E。
+两个模型还各完成 11 张图的原生 GPU 对照。以上记录覆盖构建、HTTP 联调与模型验证，浏览器整页端到端测试和 Linux 部署需另行验证。
+
+## 文档导航
+
+| 文档 | 内容 |
+| --- | --- |
+| [前端 README](./SSDD-frontend/README.md) | 技术栈、本地开发、构建与预览 |
+| [后端 README](./SSDD-backend/README.md) | 环境变量、数据库迁移、CPU / CUDA 打包、测试 |
+| [API 约定](./SSDD-frontend/API.md) | 请求与响应、检测、模型、鉴权、日志接口 |
